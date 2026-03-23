@@ -1,0 +1,186 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Agent {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  status      String   @default("draft")
+  icon        String?
+  tags        String   @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  versions    AgentVersion[]
+  deployments Deployment[]
+  testSessions TestSession[]
+  logEntries  LogEntry[]
+  metrics     PerformanceMetric[]
+  memories    AgentMemory[]
+  tools       AgentTool[]
+  skills      AgentSkill[]
+}
+
+model AgentVersion {
+  id          String   @id @default(cuid())
+  agentId     String
+  version     String
+  definition  String
+  changelog   String   @default("")
+  parentId    String?
+  tag         String?
+  createdAt   DateTime @default(now())
+
+  agent       Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  parent      AgentVersion? @relation("VersionTree", fields: [parentId], references: [id])
+  children    AgentVersion[] @relation("VersionTree")
+  deployments Deployment[]
+  testSessions TestSession[]
+
+  @@index([agentId, version])
+}
+
+model Deployment {
+  id          String   @id @default(cuid())
+  agentId     String
+  versionId   String
+  environment String
+  status      String   @default("pending")
+  config      String   @default("{}")
+  healthCheck String?
+  startedAt   DateTime?
+  stoppedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  agent       Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  version     AgentVersion @relation(fields: [versionId], references: [id])
+  logEntries  LogEntry[]
+
+  @@unique([agentId, environment])
+}
+
+model TestSession {
+  id           String   @id @default(cuid())
+  agentId      String
+  versionId    String
+  name         String   @default("Untitled Session")
+  messages     String   @default("[]")
+  sdkSessionId String?
+  metadata     String   @default("{}")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  agent        Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  version      AgentVersion @relation(fields: [versionId], references: [id])
+}
+
+model LogEntry {
+  id           String   @id @default(cuid())
+  agentId      String
+  deploymentId String?
+  level        String
+  message      String
+  metadata     String   @default("{}")
+  timestamp    DateTime @default(now())
+
+  agent        Agent      @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  deployment   Deployment? @relation(fields: [deploymentId], references: [id])
+
+  @@index([agentId, timestamp])
+  @@index([level])
+}
+
+model PerformanceMetric {
+  id           String   @id @default(cuid())
+  agentId      String
+  responseTime Float
+  inputTokens  Int
+  outputTokens Int
+  totalCostUsd Float
+  success      Boolean
+  modelUsed    String
+  numTurns     Int      @default(1)
+  metadata     String   @default("{}")
+  timestamp    DateTime @default(now())
+
+  agent        Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId, timestamp])
+}
+
+model Settings {
+  id    String @id @default("global")
+  key   String @unique
+  value String
+
+  @@map("settings")
+}
+
+model MemoryCollection {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  chromaId    String   @unique
+  totalSize   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  documents   MemoryDocument[]
+  agents      AgentMemory[]
+}
+
+model MemoryDocument {
+  id           String   @id @default(cuid())
+  collectionId String
+  fileName     String
+  fileSize     Int      @default(0)
+  chunkCount   Int      @default(0)
+  status       String   @default("processing")
+  createdAt    DateTime @default(now())
+
+  collection   MemoryCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@index([collectionId])
+}
+
+model AgentMemory {
+  id           String   @id @default(cuid())
+  agentId      String
+  collectionId String
+  createdAt    DateTime @default(now())
+
+  agent        Agent            @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  collection   MemoryCollection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, collectionId])
+}
+
+model AgentTool {
+  id        String   @id @default(cuid())
+  agentId   String
+  toolId    String
+  config    String   @default("{}")
+  createdAt DateTime @default(now())
+
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, toolId])
+}
+
+model AgentSkill {
+  id        String   @id @default(cuid())
+  agentId   String
+  skillId   String
+  createdAt DateTime @default(now())
+
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, skillId])
+}
