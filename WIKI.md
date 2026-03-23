@@ -341,27 +341,136 @@ The agent can then:
 
 **Route:** `/tools`
 
-Manage MCP (Model Context Protocol) server connections and tool configurations.
+Manage MCP (Model Context Protocol) server connections and tool configurations. The Tools page provides a unified interface for connecting 33 pre-built integrations across development, communication, productivity, data, and more.
 
-### Available Connectors
+### Available Connectors (33 total)
 
-| Connector | Auth Type | Capabilities |
-|-----------|-----------|-------------|
-| **GitHub** | OAuth | Repositories, issues, PRs, code search |
-| **Slack** | OAuth | Messages, channels, conversations |
-| **Filesystem** | None | Read, write, manage local files |
-| **PostgreSQL** | Connection String | Query, table management |
-| **Brave Search** | API Key | Web search for real-time information |
-| **Google Drive** | OAuth | File access and management |
-| **Memory** | None | Knowledge graph persistence |
-| **Puppeteer** | None | Browser automation, scraping, screenshots |
+#### Development
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **GitHub** | OAuth 2.0 | `search_repositories`, `get_file_contents`, `create_issue`, `list_pull_requests`, `create_pull_request`, `get_commit_history` | Access repositories, issues, PRs, and code search via GitHub's API |
+
+#### Communication
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **Slack** | OAuth 2.0 | `send_message`, `search_messages`, `list_channels`, `get_channel_history`, `add_reaction` | Send messages, search conversations, and manage channels |
+| **Outlook** | OAuth 2.0 | `send_email`, `read_inbox`, `search_emails`, `list_calendar_events`, `create_calendar_event`, `list_contacts` | Read/send emails, manage calendar, and access contacts via Microsoft Outlook |
+| **Gmail** | OAuth 2.0 | `send_email`, `read_inbox`, `search_emails`, `get_thread`, `create_label`, `modify_labels` | Read, send, and manage emails with full label and thread support |
+| **Discord** | API Key | `send_message`, `read_messages`, `list_channels`, `list_guild_members`, `create_channel`, `add_reaction` | Send messages, manage channels, and interact with Discord servers |
+| **Telegram** | API Key | `send_message`, `get_updates`, `send_photo`, `get_chat`, `set_webhook`, `edit_message` | Send/receive messages, manage groups, and handle media via Telegram Bot API |
+
+#### Productivity
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **Google Drive** | OAuth 2.0 | `search_files`, `read_file`, `list_files` | Access and manage files including docs, sheets, and slides |
+| **Google Calendar** | OAuth 2.0 | `list_events`, `create_event`, `update_event`, `delete_event`, `list_calendars`, `find_free_time` | Create, read, and manage events across Google Calendar accounts |
+| **OneDrive** | OAuth 2.0 | `list_files`, `upload_file`, `download_file`, `search_files`, `create_folder`, `share_file` | Access, upload, and manage files in Microsoft OneDrive |
+| **Notion** | OAuth 2.0 | `search_pages`, `read_page`, `create_page`, `update_page`, `query_database`, `create_database` | Read, create, and update pages, databases, and blocks in Notion |
+| **Airtable** | API Key | `list_records`, `create_record`, `update_record`, `delete_record`, `list_bases`, `list_tables` | Read, create, and update records in Airtable bases |
+
+#### CRM
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **HubSpot** | OAuth 2.0 | `list_contacts`, `create_contact`, `update_contact`, `list_deals`, `create_deal`, `search_crm` | Manage contacts, deals, companies, and pipelines |
+| **Salesforce** | OAuth 2.0 | `query_soql`, `create_record`, `update_record`, `delete_record`, `describe_object`, `search_sosl` | Query records, manage objects, and automate workflows |
+
+#### Data
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **PostgreSQL** | Connection String | `query`, `list_tables`, `describe_table`, `insert_row`, `update_rows` | Query and manage PostgreSQL databases |
+| **Supabase** | API Key | `query_table`, `insert_rows`, `update_rows`, `delete_rows`, `upload_file`, `invoke_function` | Query tables, manage storage, and invoke edge functions |
+| **MongoDB** | Connection String | `find_documents`, `insert_document`, `update_document`, `delete_document`, `aggregate`, `list_collections` | Query, insert, update, and aggregate documents |
+| **MySQL** | Connection String | `query`, `list_tables`, `describe_table`, `insert_row`, `update_rows`, `execute_sql` | Execute queries, manage tables, and perform operations |
+
+#### Design
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **Figma** | OAuth 2.0 | `get_file`, `get_components`, `get_styles`, `get_comments`, `export_nodes`, `list_projects` | Access design files, components, and styles from Figma |
+| **Canva** | OAuth 2.0 | `create_design`, `list_templates`, `export_design`, `upload_asset`, `list_folders`, `share_design` | Create designs, manage templates, and export assets |
+
+#### Finance
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **Stripe** | API Key | `list_customers`, `create_payment_intent`, `list_subscriptions`, `create_invoice`, `get_balance`, `list_charges` | Manage payments, customers, subscriptions, and invoices |
+| **PayPal** | OAuth 2.0 | `create_order`, `capture_payment`, `list_transactions`, `create_payout`, `get_balance`, `issue_refund` | Process payments, manage orders, and handle payouts |
+
+#### Project Management
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **Asana** | OAuth 2.0 | `list_tasks`, `create_task`, `update_task`, `list_projects`, `create_project`, `add_comment` | Manage projects, tasks, and teams |
+| **Jira** | OAuth 2.0 | `search_issues`, `create_issue`, `update_issue`, `add_comment`, `list_sprints`, `transition_issue` | Create/manage issues, search with JQL, track sprints |
+| **Confluence** | OAuth 2.0 | `search_content`, `get_page`, `create_page`, `update_page`, `list_spaces`, `get_page_children` | Read, create, and search pages and spaces |
+
+#### Search
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **Brave Search** | API Key | `brave_web_search`, `brave_local_search` | Web search for real-time information retrieval |
+| **Wikipedia** | None | `search_articles`, `get_article`, `get_summary`, `get_sections`, `get_links`, `get_categories` | Search and retrieve articles, summaries, and structured data |
+
+#### Automation
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **Puppeteer** | None | `navigate`, `screenshot`, `click`, `fill`, `evaluate` | Browser automation for web scraping and testing |
+| **Zapier** | API Key | `list_actions`, `execute_action`, `get_action_status`, `list_zaps`, `enable_zap`, `disable_zap` | Trigger Zaps, list actions, and manage automations |
+| **n8n** | API Key | `trigger_workflow`, `list_workflows`, `get_execution`, `list_executions`, `activate_workflow`, `deactivate_workflow` | Trigger workflows, manage executions in your n8n instance |
+
+#### Infrastructure
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **Cloudflare** | API Key | `list_zones`, `create_dns_record`, `list_workers`, `deploy_worker`, `kv_read`, `kv_write` | Manage DNS records, Workers, KV namespaces, and security settings |
+
+#### AI
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **Memory** | None | `create_entities`, `create_relations`, `search_nodes`, `read_graph`, `delete_entities` | Persistent knowledge graph memory for context across conversations |
+| **Context7** | None | `resolve_library_id`, `get_library_docs` | Retrieve up-to-date library documentation and code examples |
+
+#### System
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **Filesystem** | None | `read_file`, `write_file`, `list_directory`, `create_directory`, `move_file`, `search_files` | Read, write, and manage local files with configurable access controls |
+
+### Authentication Types
+
+| Type | Flow | Connectors |
+|------|------|------------|
+| **OAuth 2.0** | Opens a branded authorization popup where the user reviews requested permissions and clicks Authorize. Connection is only saved on explicit approval. | GitHub, Slack, Outlook, OneDrive, Gmail, Google Calendar, Google Drive, Notion, HubSpot, Salesforce, Figma, Canva, PayPal, Asana, Jira, Confluence |
+| **API Key** | User enters an API key/token in a dialog and clicks Connect. | Brave Search, Discord, Telegram, Airtable, Supabase, Stripe, Zapier, Cloudflare, n8n |
+| **Connection String** | User enters a database connection string. | PostgreSQL, MongoDB, MySQL |
+| **None** | No credentials required — connects instantly. | Filesystem, Memory, Puppeteer, Wikipedia, Context7 |
+
+### OAuth Authorization Flow
+
+OAuth connectors use a popup-based authorization flow:
+
+1. User clicks **Connect** on an OAuth connector
+2. A popup opens showing the `/tools/oauth` authorization page, branded with the provider's color scheme, icon, and name
+3. The page displays requested permissions (e.g., "Read & send emails", "Manage calendar events")
+4. User clicks **Authorize** to grant access or **Deny** to cancel
+5. On Authorize: a 2-second token exchange simulation runs, then a success screen appears and the popup closes, sending a `postMessage` to the parent window
+6. On Deny: the popup sends a failure message and closes — no connection is saved
+7. If the user closes the popup without clicking either button, the pending state is cleared
+
+The connection is **only** marked as connected when the popup sends a `success: true` message — closing the popup or denying access does not create a connection.
 
 ### Operations
 
-- **Connect** — Configure credentials for a connector
-- **Disconnect** — Remove credentials
-- **Test** — Verify the connection works
-- **Assign to Agent** — Link a connector to an agent
+- **Connect** — Configure credentials for a connector (OAuth popup, API key dialog, or instant for no-auth)
+- **Disconnect** — Remove credentials and revoke access
+- **Assign to Agent** — Link a connected tool to an agent from the agent's configuration page
 - **Custom Tools** — Create custom tool definitions with name, description, and JSON Schema input
 
 ### Built-in Executable Tools

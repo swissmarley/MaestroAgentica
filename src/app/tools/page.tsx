@@ -5,14 +5,11 @@ import {
   Wrench,
   Plus,
   Search,
-  Github,
-  MessageSquare,
   FolderOpen,
   Database,
   Cloud,
   Brain,
   Monitor,
-  ExternalLink,
   Check,
   Loader2,
   Plug,
@@ -25,7 +22,6 @@ import {
   Unlink,
   Settings,
   Shield,
-  X,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
@@ -49,6 +45,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CONNECTOR_ICON_MAP } from "@/components/icons/connector-icons";
 
 interface McpConnector {
   id: string;
@@ -74,9 +71,8 @@ interface ToolConnection {
 
 type ConnectionMap = Record<string, ToolConnection>;
 
-const ICON_MAP: Record<string, React.ReactNode> = {
-  github: <Github className="h-5 w-5" />,
-  slack: <MessageSquare className="h-5 w-5" />,
+// Fallback Lucide icons for connectors that don't have brand SVGs
+const LUCIDE_ICON_MAP: Record<string, React.ReactNode> = {
   folder: <FolderOpen className="h-5 w-5" />,
   database: <Database className="h-5 w-5" />,
   search: <Search className="h-5 w-5" />,
@@ -84,6 +80,18 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   brain: <Brain className="h-5 w-5" />,
   globe: <Monitor className="h-5 w-5" />,
 };
+
+function ConnectorIcon({ iconKey, className = "h-5 w-5" }: { iconKey: string; className?: string }) {
+  const BrandIcon = CONNECTOR_ICON_MAP[iconKey];
+  if (BrandIcon) {
+    return <BrandIcon className={className} />;
+  }
+  const lucideIcon = LUCIDE_ICON_MAP[iconKey];
+  if (lucideIcon) {
+    return <>{lucideIcon}</>;
+  }
+  return <Wrench className={className} />;
+}
 
 const CATEGORY_COLORS: Record<string, string> = {
   Development: "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300",
@@ -95,6 +103,11 @@ const CATEGORY_COLORS: Record<string, string> = {
   AI: "bg-pink-100 dark:bg-pink-900/50 text-pink-700 dark:text-pink-300",
   Automation: "bg-cyan-100 dark:bg-cyan-900/50 text-cyan-700 dark:text-cyan-300",
   Custom: "bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300",
+  CRM: "bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300",
+  Design: "bg-fuchsia-100 dark:bg-fuchsia-900/50 text-fuchsia-700 dark:text-fuchsia-300",
+  Finance: "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300",
+  "Project Management": "bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300",
+  Infrastructure: "bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300",
 };
 
 const AUTH_LABELS: Record<string, string> = {
@@ -124,6 +137,24 @@ export default function ToolsPage() {
     fetchTools();
     loadConnections();
   }, []);
+
+  // Listen for OAuth postMessage from popup
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === "oauth_complete") {
+        const { connectorId, success } = event.data;
+        if (success) {
+          completeOAuth(connectorId);
+        } else {
+          // User denied — just clear pending state
+          setOauthPending(null);
+        }
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  });
 
   const fetchTools = async () => {
     try {
@@ -165,35 +196,23 @@ export default function ToolsPage() {
     } catch { /* ignore */ }
   }, []);
 
-  // Handle OAuth flow
-  const handleOAuthConnect = async (connector: McpConnector) => {
+  // Handle OAuth flow — opens our own authorize page in a popup
+  const handleOAuthConnect = (connector: McpConnector) => {
     setOauthPending(connector.id);
 
-    // Open OAuth popup
-    if (connector.authUrl) {
-      const redirectUri = `${window.location.origin}/api/tools/callback`;
-      const oauthUrl = `${connector.authUrl}?client_id=maestro_agentica&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read,write&state=${connector.id}`;
-      const popup = window.open(oauthUrl, `oauth_${connector.id}`, "width=600,height=700,scrollbars=yes");
+    const authorizeUrl = `/tools/oauth?connector=${encodeURIComponent(connector.id)}&name=${encodeURIComponent(connector.name)}`;
+    const popup = window.open(authorizeUrl, `oauth_${connector.id}`, "width=500,height=680,scrollbars=yes");
 
-      // Poll for popup close (simulated OAuth completion)
-      const checkClosed = setInterval(() => {
-        if (popup && popup.closed) {
-          clearInterval(checkClosed);
-          completeOAuth(connector.id);
-        }
-      }, 500);
-
-      // Auto-complete after 5s if popup is still open (simulated)
-      setTimeout(() => {
+    // If user closes popup without authorizing, clear pending state
+    const checkClosed = setInterval(() => {
+      if (popup && popup.closed) {
         clearInterval(checkClosed);
-        if (popup && !popup.closed) popup.close();
-        completeOAuth(connector.id);
-      }, 5000);
-    } else {
-      // No auth URL, simulate quick connection
-      await new Promise((r) => setTimeout(r, 1500));
-      completeOAuth(connector.id);
-    }
+        // Small delay to allow postMessage to arrive first
+        setTimeout(() => {
+          setOauthPending((current) => (current === connector.id ? null : current));
+        }, 500);
+      }
+    }, 500);
   };
 
   const completeOAuth = (connectorId: string) => {
@@ -366,7 +385,7 @@ export default function ToolsPage() {
           <Input placeholder="Search tools..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             {categories.map((cat) => (
               <SelectItem key={cat} value={cat}>{cat === "all" ? "All Categories" : cat}</SelectItem>
@@ -389,7 +408,7 @@ export default function ToolsPage() {
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     <div className={`rounded-lg p-2.5 ${CATEGORY_COLORS[connector.category] || CATEGORY_COLORS.Custom}`}>
-                      {ICON_MAP[connector.icon] || <Wrench className="h-5 w-5" />}
+                      <ConnectorIcon iconKey={connector.icon} />
                     </div>
                     <div>
                       <CardTitle className="text-sm">{connector.name}</CardTitle>
@@ -500,7 +519,9 @@ export default function ToolsPage() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              {connectDialog && ICON_MAP[connectDialog.icon]}
+              <div className={`rounded-md p-1.5 ${CATEGORY_COLORS[connectDialog?.category || "Custom"] || CATEGORY_COLORS.Custom}`}>
+                {connectDialog && <ConnectorIcon iconKey={connectDialog.icon} className="h-4 w-4" />}
+              </div>
               Connect {connectDialog?.name}
             </DialogTitle>
             <DialogDescription>
@@ -537,7 +558,13 @@ export default function ToolsPage() {
                   <Link2 className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     type="password"
-                    placeholder="postgresql://user:password@host:5432/dbname"
+                    placeholder={
+                      connectDialog.id === "mongodb"
+                        ? "mongodb+srv://user:password@cluster.mongodb.net/dbname"
+                        : connectDialog.id === "mysql"
+                        ? "mysql://user:password@host:3306/dbname"
+                        : "protocol://user:password@host:port/dbname"
+                    }
                     className="pl-9 font-mono text-sm"
                     value={connectForm.connectionString}
                     onChange={(e) => setConnectForm((p) => ({ ...p, connectionString: e.target.value }))}
