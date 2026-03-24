@@ -10,12 +10,17 @@ export interface ToolCallInfo {
   completedAt?: number;
 }
 
+export interface SkillInfo {
+  name: string;
+}
+
 export interface PlaygroundMessage {
   id: string;
   role: MessageRole;
   content: string;
   timestamp: number;
   toolCalls?: ToolCallInfo[];
+  activeSkills?: SkillInfo[];
   tokenCount?: number;
   isStreaming?: boolean;
 }

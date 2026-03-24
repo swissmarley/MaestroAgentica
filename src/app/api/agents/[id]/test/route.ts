@@ -36,9 +36,10 @@ export async function POST(
 ) {
   try {
     const body = await request.json();
-    const { prompt, versionId } = body as {
+    const { prompt, versionId, history } = body as {
       prompt?: string;
       versionId?: string;
+      history?: Array<{ role: "user" | "assistant"; content: string }>;
     };
 
     if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
@@ -180,11 +181,32 @@ export async function POST(
             encoder.encode(sendSSE("message_start", { model: definition.model }))
           );
 
-          const messages: Anthropic.MessageParam[] = [
-            { role: "user", content: prompt.trim() },
-          ];
+          // Emit active skills so the frontend can show indicators
+          const enabledSkills = definition.skills?.filter((s) => s.enabled) || [];
+          if (enabledSkills.length > 0) {
+            controller.enqueue(
+              encoder.encode(
+                sendSSE("skills_active", {
+                  skills: enabledSkills.map((s) => ({ name: s.name })),
+                })
+              )
+            );
+          }
 
-          const maxTurns = definition.maxTurns || 1;
+          // Build messages with conversation history for multi-turn context
+          const messages: Anthropic.MessageParam[] = [];
+          if (history && Array.isArray(history)) {
+            for (const msg of history) {
+              if (msg.role === "user" || msg.role === "assistant") {
+                messages.push({ role: msg.role, content: msg.content });
+              }
+            }
+          }
+          messages.push({ role: "user", content: prompt.trim() });
+
+          // Ensure at least 2 turns so tools can execute and the agent
+          // can produce a final response based on tool results.
+          const maxTurns = Math.max(definition.maxTurns || 10, 2);
 
           while (turnCount < maxTurns) {
             turnCount++;
@@ -300,12 +322,14 @@ export async function POST(
                 }
                 case "content_block_stop": {
                   // If this was a tool_use block, capture it
-                  if (currentToolId && currentToolInputJson && !serverToolIds.has(currentToolId)) {
+                  if (currentToolId && !serverToolIds.has(currentToolId)) {
                     let parsedInput: Record<string, unknown> = {};
-                    try {
-                      parsedInput = JSON.parse(currentToolInputJson);
-                    } catch {
-                      // bad JSON
+                    if (currentToolInputJson) {
+                      try {
+                        parsedInput = JSON.parse(currentToolInputJson);
+                      } catch {
+                        // bad JSON — use empty input
+                      }
                     }
                     toolUseBlocks.push({
                       id: currentToolId,
@@ -336,7 +360,7 @@ export async function POST(
             totalOutputTokens += finalMessage.usage?.output_tokens || 0;
 
             // ── Execute tools for real ──────────────────────────────────
-            if (hasToolUse && toolUseBlocks.length > 0 && turnCount < maxTurns) {
+            if (hasToolUse && toolUseBlocks.length > 0) {
               const toolResults: Anthropic.ToolResultBlockParam[] = [];
 
               for (const block of toolUseBlocks) {

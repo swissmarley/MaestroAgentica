@@ -29,7 +29,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: "Key is required" }, { status: 400 });
     }
 
-    const allowedKeys = ["anthropic_api_key", "default_model", "theme", "activated_skills", "connected_tools", "tool_connections"];
+    const allowedKeys = ["anthropic_api_key", "default_model", "theme", "activated_skills", "connected_tools", "tool_connections", "oauth_configs", "oauth_tokens"];
     if (!allowedKeys.includes(key)) {
       return NextResponse.json({ error: "Invalid setting key" }, { status: 400 });
     }

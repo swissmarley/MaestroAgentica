@@ -132,6 +132,8 @@ export default function ToolsPage() {
   const [connectForm, setConnectForm] = useState({ apiKey: "", connectionString: "" });
   const [connecting, setConnecting] = useState(false);
   const [oauthPending, setOauthPending] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
 
   useEffect(() => {
     fetchTools();
@@ -143,9 +145,9 @@ export default function ToolsPage() {
     const handleMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
       if (event.data?.type === "oauth_complete") {
-        const { connectorId, success } = event.data;
+        const { connectorId, success, tokenData } = event.data;
         if (success) {
-          completeOAuth(connectorId);
+          completeOAuth(connectorId, tokenData);
         } else {
           // User denied — just clear pending state
           setOauthPending(null);
@@ -215,18 +217,22 @@ export default function ToolsPage() {
     }, 500);
   };
 
-  const completeOAuth = (connectorId: string) => {
+  const completeOAuth = (connectorId: string, tokenData?: { accessToken?: string; refreshToken?: string; expiresIn?: number; scope?: string; tokenType?: string }) => {
     const newConnections = {
       ...connections,
       [connectorId]: {
         connected: true,
         authType: "oauth",
-        oauthToken: "oauth_token_" + Date.now(),
+        hasToken: !!tokenData?.accessToken,
+        tokenType: tokenData?.tokenType || "Bearer",
+        scope: tokenData?.scope || "",
         connectedAt: new Date().toISOString(),
       },
     };
     saveConnections(newConnections);
     setOauthPending(null);
+    // Reload connections from server to sync with token storage
+    loadConnections();
   };
 
   // Handle API Key connection
@@ -272,6 +278,34 @@ export default function ToolsPage() {
     setConnecting(false);
     setConnectDialog(null);
     setConnectForm({ apiKey: "", connectionString: "" });
+  };
+
+  // Handle test connection for API key tools
+  const handleTestConnection = async () => {
+    if (!connectDialog || !connectForm.apiKey.trim()) return;
+    setTesting(true);
+    setTestResult(null);
+
+    try {
+      const res = await fetch("/api/tools/test-connection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          connectorId: connectDialog.id,
+          apiKey: connectForm.apiKey.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      setTestResult({
+        success: data.success === true,
+        message: data.message || (data.success ? "Connection successful!" : "Connection failed."),
+      });
+    } catch {
+      setTestResult({ success: false, message: "Failed to test connection. Check your network." });
+    } finally {
+      setTesting(false);
+    }
   };
 
   // Handle no-auth connection
@@ -515,7 +549,7 @@ export default function ToolsPage() {
       )}
 
       {/* API Key / Connection String Dialog */}
-      <Dialog open={!!connectDialog} onOpenChange={(open) => { if (!open) { setConnectDialog(null); setConnectForm({ apiKey: "", connectionString: "" }); } }}>
+      <Dialog open={!!connectDialog} onOpenChange={(open) => { if (!open) { setConnectDialog(null); setConnectForm({ apiKey: "", connectionString: "" }); setTestResult(null); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -545,9 +579,38 @@ export default function ToolsPage() {
                     onChange={(e) => setConnectForm((p) => ({ ...p, apiKey: e.target.value }))}
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  You can find your API key in the {connectDialog.name} dashboard settings.
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground flex-1">
+                    You can find your API key in the {connectDialog.name} dashboard settings.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleTestConnection}
+                    disabled={testing || !connectForm.apiKey.trim()}
+                    className="shrink-0"
+                  >
+                    {testing ? (
+                      <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> Testing...</>
+                    ) : (
+                      <><Plug className="h-3.5 w-3.5 mr-1" /> Test</>
+                    )}
+                  </Button>
+                </div>
+                {testResult && (
+                  <div className={`flex items-start gap-2 rounded-md px-3 py-2 text-xs ${
+                    testResult.success
+                      ? "bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300"
+                      : "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300"
+                  }`}>
+                    {testResult.success ? (
+                      <Check className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    ) : (
+                      <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    )}
+                    <span>{testResult.message}</span>
+                  </div>
+                )}
               </div>
             )}
 

@@ -11,20 +11,22 @@ A comprehensive guide to every feature, page, and operation available in Maestro
 3. [Agents](#3-agents)
    - [Creating an Agent](#31-creating-an-agent)
    - [Agent Detail Page](#32-agent-detail-page)
-   - [Playground](#33-playground)
+   - [Playground (per-agent)](#33-playground)
    - [Versions](#34-versions)
    - [Deployments](#35-deployments)
    - [Metrics](#36-metrics)
    - [Logs](#37-logs)
-4. [Memory](#4-memory)
-5. [Tools](#5-tools)
-6. [Skills](#6-skills)
-7. [Marketplace (Import/Export)](#7-marketplace-importexport)
-8. [Diagnostics](#8-diagnostics)
-9. [Settings](#9-settings)
-10. [API Reference](#10-api-reference)
-11. [Architecture](#11-architecture)
-12. [Data Models](#12-data-models)
+4. [Chat Playground](#4-chat-playground)
+5. [Memory](#5-memory)
+6. [Tools](#6-tools)
+7. [Skills](#7-skills)
+8. [Marketplace (Import/Export)](#8-marketplace-importexport)
+9. [Diagnostics](#9-diagnostics)
+10. [Settings](#10-settings)
+11. [API Reference](#11-api-reference)
+12. [Architecture](#12-architecture)
+13. [Data Models](#13-data-models)
+14. [Changelog](#14-changelog)
 
 ---
 
@@ -287,7 +289,60 @@ Structured logging system for monitoring agent behavior.
 
 ---
 
-## 4. Memory
+## 4. Chat Playground
+
+**Route:** `/playground`
+
+A dedicated, full-page chat interface for testing any agent with real tool execution, file attachments, and full conversation memory.
+
+### Layout
+
+- **Sidebar** — Agent selection dropdown, channel selector (Development / Staging / Production), session info, and New Chat button
+- **Chat Area** — Message thread with rich rendering, input bar at the bottom with file attachment support
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| **Agent Selection** | Dropdown lists all agents in the system. Select one to start chatting. |
+| **Channel Selection** | Choose between Development, Staging, or Production environments. |
+| **Conversation Memory** | Full message history is sent with every request. The agent retains context across the entire session. |
+| **File Attachments** | Attach images, PDFs, Excel, TXT, and other files via drag-and-drop or the clip icon. Image previews are shown inline. |
+| **Rich Rendering** | Agent responses render markdown: code blocks with syntax labels, bold, italic, and inline code. |
+| **Streaming Responses** | Responses appear token-by-token via Server-Sent Events. |
+| **Tool Usage Indicators** | When the agent invokes tools, expandable cards show the tool name, input, output, and status (running/completed/error) with timing. |
+| **Skill Usage Indicators** | When the agent has active skills, amber badges display each skill name on assistant messages (e.g., "Documentation Writer"). |
+| **Copy Messages** | Hover over any message to reveal a copy button. |
+| **Token Tracking** | Output token count displayed per assistant message. |
+| **New Chat** | Clears conversation history and starts a fresh session. |
+
+### How Conversation Memory Works
+
+1. All prior user and assistant messages are collected from the current session
+2. They are sent as the `history` array in the API request body
+3. The backend prepends the full history to the Anthropic API `messages` array
+4. The agent sees the complete conversation context on every turn
+
+Memory is scoped per session — starting a "New Chat" resets it completely.
+
+### How Skill Indicators Work
+
+1. When a message is sent, the backend checks for enabled skills in the agent definition
+2. A `skills_active` SSE event is emitted at the start of the stream with the list of active skill names
+3. The frontend displays amber badges on the assistant message showing which skills are active
+4. Skills are injected into the system prompt, not called as tools — the badges indicate which specialized instructions are influencing the agent's behavior
+
+### How Tool Indicators Work
+
+1. When the agent decides to use a tool, a `tool_use_start` SSE event is emitted
+2. The frontend shows an expandable card with a spinning indicator and the tool name
+3. When the tool completes, a `tool_result` event updates the card with output and duration
+4. Cards can be expanded to inspect the full input JSON and output text
+5. On stream completion, any still-running tools are automatically marked as completed
+
+---
+
+## 5. Memory
 
 **Route:** `/memory`
 
@@ -337,7 +392,7 @@ The agent can then:
 
 ---
 
-## 5. Tools
+## 6. Tools
 
 **Route:** `/tools`
 
@@ -454,17 +509,27 @@ Manage MCP (Model Context Protocol) server connections and tool configurations. 
 
 ### OAuth Authorization Flow
 
-OAuth connectors use a popup-based authorization flow:
+OAuth connectors use a real popup-based OAuth 2.0 authorization code flow:
 
 1. User clicks **Connect** on an OAuth connector
 2. A popup opens showing the `/tools/oauth` authorization page, branded with the provider's color scheme, icon, and name
-3. The page displays requested permissions (e.g., "Read & send emails", "Manage calendar events")
-4. User clicks **Authorize** to grant access or **Deny** to cancel
-5. On Authorize: a 2-second token exchange simulation runs, then a success screen appears and the popup closes, sending a `postMessage` to the parent window
-6. On Deny: the popup sends a failure message and closes — no connection is saved
-7. If the user closes the popup without clicking either button, the pending state is cleared
+3. The page displays:
+   - **Redirect URI** — The callback URL to register in the provider's OAuth app settings (with copy button)
+   - **Client ID** field — Required to start the flow
+   - **Client Secret** field — Required for the token exchange step
+   - **Requested permissions** — Provider-specific scopes (e.g., "Read & send emails", "Manage calendar events")
+   - **Setup guide link** — Links to the provider's OAuth app documentation
+4. User enters their OAuth app credentials and clicks **Authorize**
+5. The browser redirects to the real provider authorization URL (e.g., `https://github.com/login/oauth/authorize`) with proper `client_id`, `redirect_uri`, `response_type=code`, `state`, and `scope` parameters
+6. After the user grants access at the provider, the callback (`/tools/oauth/callback`) receives the authorization code
+7. The callback extracts the connector ID from the `state` parameter and calls `/api/tools/oauth/token` to exchange the code for access/refresh tokens
+8. On success, the callback sends a `postMessage` with the token data to the parent window, which persists the connection
+9. On Deny: the popup sends a failure message and closes — no connection is saved
+10. If the user closes the popup without completing, the pending state is cleared
 
-The connection is **only** marked as connected when the popup sends a `success: true` message — closing the popup or denying access does not create a connection.
+Each provider has its own specific configuration (authorization URL, token URL, scopes, and provider-specific parameters like `access_type=offline` for Google or `audience=api.atlassian.com` for Atlassian).
+
+The connection is **only** marked as connected when the popup sends a `success: true` message with valid token data — closing the popup or denying access does not create a connection.
 
 ### Operations
 
@@ -491,7 +556,7 @@ These tools execute directly in the playground without needing an MCP server:
 
 ---
 
-## 6. Skills
+## 7. Skills
 
 **Route:** `/skills`
 
@@ -534,7 +599,7 @@ Your skill instructions here...
 
 ---
 
-## 7. Marketplace (Import/Export)
+## 8. Marketplace (Import/Export)
 
 **Route:** `/marketplace`
 
@@ -566,7 +631,7 @@ Share and reuse agents across projects.
 
 ---
 
-## 8. Diagnostics
+## 9. Diagnostics
 
 **Route:** `/diagnostics`
 
@@ -611,7 +676,7 @@ This is useful for verifying that filesystem operations, memory queries, and oth
 
 ---
 
-## 9. Settings
+## 10. Settings
 
 **Route:** `/settings`
 
@@ -633,7 +698,7 @@ Click "Test" after entering your API key to verify it works before saving.
 
 ---
 
-## 10. API Reference
+## 11. API Reference
 
 ### Agent Endpoints
 
@@ -733,7 +798,7 @@ POST   /api/diagnostics                # Execute a tool (body: { toolName, input
 
 ---
 
-## 11. Architecture
+## 12. Architecture
 
 ### Request Flow
 
@@ -786,7 +851,7 @@ SQLite with Prisma ORM. All relations cascade on delete.
 
 ---
 
-## 12. Data Models
+## 13. Data Models
 
 ### Agent
 
@@ -856,3 +921,24 @@ SQLite with Prisma ORM. All relations cascade on delete.
 | success | boolean | Whether execution succeeded |
 | modelUsed | string | Model ID used |
 | numTurns | int | Number of tool-use turns |
+
+---
+
+## 14. Changelog
+
+### v0.2.0 — Chat Playground & Bug Fixes
+
+#### New Features
+
+- **Dedicated Chat Playground** (`/playground`) — Full-page chat interface with agent selection, channel picker, file attachments, and streaming responses
+- **Skill Usage Indicators** — Amber badges on assistant messages showing which skills are active during the conversation (e.g., "Documentation Writer", "Code Review")
+- **Tool Usage Indicators** — Expandable cards showing tool name, input, output, status, and execution duration during agent conversations
+- **Conversation Memory** — Full message history is passed with every request, maintaining context across the entire chat session
+
+#### Bug Fixes
+
+- **Agent Chat Memory** — Fixed conversation history not being passed to the agent on subsequent messages. Prior messages are now correctly sent as the `history` array on every turn.
+- **Filesystem Tools Hanging** — Fixed tool execution never completing when `maxTurns` was set to 1. The minimum is now enforced at 2 turns when tools are available (one for tool invocation, one for processing results). Also fixed tools with empty input not being captured due to a falsy-check on the input JSON string.
+- **Tool Spinner Never Stopping** — Added safety net that marks any remaining "running" tool calls as "completed" when the stream ends, ensuring spinners always resolve.
+- **OAuth Hydration Errors** — Fixed `window.location.origin` being computed during server render, causing Next.js hydration mismatch errors on all OAuth tool pages. The redirect URI is now set via `useEffect` on the client only.
+- **No Agents in Playground** — Fixed the agent dropdown showing no agents. The `/api/agents` endpoint returns an array directly, but the playground expected `data.agents`. Now handles both formats.

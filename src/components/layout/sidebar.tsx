@@ -16,6 +16,7 @@ import {
   Sparkles,
   Wand2,
   Activity,
+  MessageSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,7 @@ const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/agent-builder", label: "Agent Builder", icon: Wand2 },
   { href: "/agents", label: "Agents", icon: Bot },
+  { href: "/playground", label: "Playground", icon: MessageSquare },
   { href: "/memory", label: "Memory", icon: Brain },
   { href: "/tools", label: "Tools", icon: Wrench },
   { href: "/skills", label: "Skills", icon: Sparkles },

@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Sparkles,
   Plus,
   Search,
   Check,
-  Copy,
   Code2,
   Shield,
   TestTube,
@@ -20,6 +19,8 @@ import {
   Loader2,
   Zap,
   Info,
+  Download,
+  Upload,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
@@ -93,6 +94,9 @@ export default function SkillsPage() {
   });
   const [generatorPrompt, setGeneratorPrompt] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchSkills();
@@ -112,10 +116,101 @@ export default function SkillsPage() {
     }
   };
 
-  const handleCopyContent = async (skill: Skill) => {
-    await navigator.clipboard.writeText(skill.content);
-    setCopied(skill.id);
-    setTimeout(() => setCopied(null), 2000);
+  const handleExportSkill = async (skill: Skill) => {
+    try {
+      const JSZip = (await import("jszip")).default;
+      const zip = new JSZip();
+
+      // Add skill metadata as JSON
+      zip.file("skill.json", JSON.stringify({
+        id: skill.id,
+        name: skill.name,
+        description: skill.description,
+        category: skill.category,
+        exportedAt: new Date().toISOString(),
+        version: "1.0.0",
+      }, null, 2));
+
+      // Add skill content as markdown
+      zip.file("skill.md", skill.content);
+
+      const blob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${skill.name.toLowerCase().replace(/\s+/g, "-")}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      setCopied(skill.id);
+      setTimeout(() => setCopied(null), 2000);
+    } catch {
+      // export failed
+    }
+  };
+
+  const handleImportSkill = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    setImportError(null);
+
+    try {
+      const JSZip = (await import("jszip")).default;
+      const zip = await JSZip.loadAsync(file);
+
+      // Validate required files
+      const metaFile = zip.file("skill.json");
+      const contentFile = zip.file("skill.md");
+
+      if (!metaFile || !contentFile) {
+        throw new Error("Invalid skill package. Must contain skill.json and skill.md files.");
+      }
+
+      const metaJson = await metaFile.async("string");
+      const content = await contentFile.async("string");
+
+      let meta: { name?: string; description?: string; category?: string };
+      try {
+        meta = JSON.parse(metaJson);
+      } catch {
+        throw new Error("Invalid skill.json — could not parse metadata.");
+      }
+
+      if (!meta.name?.trim()) {
+        throw new Error("Skill name is missing in skill.json.");
+      }
+
+      // Create the imported skill
+      const res = await fetch("/api/skills", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: meta.name,
+          description: meta.description || "",
+          content: content,
+          category: meta.category || "Custom",
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to create imported skill.");
+      }
+
+      const created = await res.json();
+      setSkills((prev) => [...prev, created]);
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : "Failed to import skill.");
+    } finally {
+      setImporting(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
   };
 
   const handleCreate = async () => {
@@ -213,11 +308,34 @@ Based on the description: "${generatorPrompt}"
           <Button variant="outline" onClick={() => setGeneratorOpen(true)}>
             <Zap className="mr-2 h-4 w-4" /> Skill Creator
           </Button>
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+            {importing ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Importing...</>
+            ) : (
+              <><Upload className="mr-2 h-4 w-4" /> Import Skill</>
+            )}
+          </Button>
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="mr-2 h-4 w-4" /> New Skill
           </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".zip"
+            onChange={handleImportSkill}
+            className="hidden"
+          />
         </div>
       </Header>
+
+      {/* Import error */}
+      {importError && (
+        <div className="rounded-md bg-destructive/10 border border-destructive/20 px-4 py-2 text-sm text-destructive flex items-center gap-2">
+          <Info className="h-4 w-4 shrink-0" />
+          {importError}
+          <button onClick={() => setImportError(null)} className="ml-auto text-xs underline">Dismiss</button>
+        </div>
+      )}
 
       {/* Info banner */}
       <div className="rounded-md bg-muted/50 border px-4 py-3 flex gap-2">
@@ -303,23 +421,23 @@ Based on the description: "${generatorPrompt}"
                   )}
                 </div>
 
-                {/* Copy button */}
+                {/* Export button */}
                 <div className="flex gap-2">
                   <Button
                     size="sm"
                     variant="outline"
                     className="flex-1"
-                    onClick={() => handleCopyContent(skill)}
+                    onClick={() => handleExportSkill(skill)}
                   >
                     {isCopied ? (
                       <>
                         <Check className="h-3.5 w-3.5 mr-1.5" />
-                        Copied
+                        Exported
                       </>
                     ) : (
                       <>
-                        <Copy className="h-3.5 w-3.5 mr-1.5" />
-                        Copy Content
+                        <Download className="h-3.5 w-3.5 mr-1.5" />
+                        Export Skill
                       </>
                     )}
                   </Button>
