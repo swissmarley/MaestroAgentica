@@ -86,6 +86,7 @@ export default function PlaygroundPage() {
   // Refs
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Load agents on mount
   useEffect(() => {
@@ -233,6 +234,9 @@ export default function PlaygroundPage() {
     setInput("");
     setAttachments([]);
 
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     try {
       // Build conversation history
       const priorMessages = messages
@@ -247,6 +251,7 @@ export default function PlaygroundPage() {
           versionId: selectedVersionId,
           history: priorMessages,
         }),
+        signal: abortController.signal,
       });
 
       if (!res.ok) {
@@ -361,17 +366,44 @@ export default function PlaygroundPage() {
         }
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to send message";
-      setError(message);
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantMessageId
-            ? { ...m, content: m.content || "Error: " + message, isStreaming: false }
-            : m
-        )
-      );
+      // Don't show error for intentional abort (stop button)
+      if (err instanceof DOMException && err.name === "AbortError") {
+        // Finalize the message with whatever content was accumulated
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMessageId
+              ? { ...m, isStreaming: false }
+              : m
+          )
+        );
+        // Mark all running tool calls as completed
+        setToolCalls((prev) =>
+          prev.map((tc) =>
+            tc.status === "running"
+              ? { ...tc, status: "completed" as const, completedAt: Date.now() }
+              : tc
+          )
+        );
+      } else {
+        const message = err instanceof Error ? err.message : "Failed to send message";
+        setError(message);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMessageId
+              ? { ...m, content: m.content || "Error: " + message, isStreaming: false }
+              : m
+          )
+        );
+      }
     } finally {
+      abortControllerRef.current = null;
       setIsStreaming(false);
+    }
+  };
+
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
   };
 
@@ -778,7 +810,7 @@ export default function PlaygroundPage() {
                 disabled={isStreaming || !selectedAgentId}
               />
               {isStreaming ? (
-                <Button variant="destructive" size="icon" className="shrink-0 h-10 w-10">
+                <Button variant="destructive" size="icon" className="shrink-0 h-10 w-10" onClick={handleStop} title="Stop generating">
                   <Square className="h-4 w-4" />
                 </Button>
               ) : (
