@@ -23,10 +23,11 @@ A comprehensive guide to every feature, page, and operation available in Maestro
 8. [Marketplace (Import/Export)](#8-marketplace-importexport)
 9. [Diagnostics](#9-diagnostics)
 10. [Settings](#10-settings)
-11. [API Reference](#11-api-reference)
-12. [Architecture](#12-architecture)
-13. [Data Models](#13-data-models)
-14. [Changelog](#14-changelog)
+11. [CLI (Command-Line Interface)](#11-cli-command-line-interface)
+12. [API Reference](#12-api-reference)
+13. [Architecture](#13-architecture)
+14. [Data Models](#14-data-models)
+15. [Changelog](#15-changelog)
 
 ---
 
@@ -698,7 +699,90 @@ Click "Test" after entering your API key to verify it works before saving.
 
 ---
 
-## 11. API Reference
+## 11. CLI (Command-Line Interface)
+
+The MaestroAgentica CLI provides a terminal-based interface for interacting with agents directly from the command line.
+
+### Installation & Launch
+
+```bash
+# Run directly from the project
+node cli/maestro.mjs
+
+# With options
+node cli/maestro.mjs --url http://localhost:3000 --env development
+```
+
+### Command-Line Flags
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--url <url>` | Base URL of the MaestroAgentica server | `http://localhost:3000` |
+| `--agent <name>` | Connect directly to a named agent (skip selection menu) | — |
+| `--env <env>` | Environment: `development`, `staging`, `production` | `development` |
+| `--key <key>` | API key for authentication | — |
+| `--help` | Show help and exit | — |
+
+### Interactive Commands
+
+Once connected, use these commands at any time by typing them in the chat:
+
+| Command | Description |
+|---------|-------------|
+| `/agents` | List all available agents |
+| `/select <name>` | Switch to a different agent (supports fuzzy matching) |
+| `/new` | Start a new conversation (clears history) |
+| `/history` | Show the current conversation history |
+| `/conversations` | Info about viewing past conversations |
+| `/load <id>` | Info about loading past conversations |
+| `/clear` | Clear the terminal display |
+| `/exit` | Exit the CLI |
+| `/help` | Show available commands |
+
+### Features
+
+- **Streaming Responses** — Agent responses are streamed token-by-token via SSE
+- **Tool Visualization** — Tool invocations are displayed inline with status indicators (`⚡ Using tool: <name> [done]` or `[error]`)
+- **Conversation Memory** — Full message history is passed on every turn, maintaining context throughout the session
+- **Multi-line Input** — End a line with `\` to continue on the next line
+- **Token Tracking** — Input/output token counts are shown after each response
+- **Config Persistence** — Connection settings (`--url`, `--key`, `--env`) are saved to `~/.maestro/config.json` for reuse
+- **Agent Fuzzy Matching** — Both `/select` and `--agent` support partial name matching
+
+### Example Session
+
+```
+  ╔══════════════════════════════════════╗
+  ║       MaestroAgentica CLI v0.1       ║
+  ╚══════════════════════════════════════╝
+
+  Server: http://localhost:3000
+  Environment: development
+
+Available Agents:
+──────────────────────────────────────────────────
+  ► 1. CodeAssistant (a3f2b1c8...) [active]
+       A helpful coding assistant with filesystem tools
+
+Select an agent (number or name): 1
+Connected to CodeAssistant
+
+You (CodeAssistant): List the files in the current directory
+
+CodeAssistant:
+  ⚡ Using tool: list_directory [done]
+
+Here are the files in the agent sandbox:
+- README.md
+- src/
+- package.json
+
+  [245 input / 38 output tokens]
+```
+
+---
+
+## 12. API Reference
 
 ### Agent Endpoints
 
@@ -798,7 +882,7 @@ POST   /api/diagnostics                # Execute a tool (body: { toolName, input
 
 ---
 
-## 12. Architecture
+## 13. Architecture
 
 ### Request Flow
 
@@ -851,7 +935,7 @@ SQLite with Prisma ORM. All relations cascade on delete.
 
 ---
 
-## 13. Data Models
+## 14. Data Models
 
 ### Agent
 
@@ -924,7 +1008,7 @@ SQLite with Prisma ORM. All relations cascade on delete.
 
 ---
 
-## 14. Changelog
+## 15. Changelog
 
 ### v0.2.0 — Chat Playground & Bug Fixes
 
@@ -942,3 +1026,4 @@ SQLite with Prisma ORM. All relations cascade on delete.
 - **Tool Spinner Never Stopping** — Added safety net that marks any remaining "running" tool calls as "completed" when the stream ends, ensuring spinners always resolve.
 - **OAuth Hydration Errors** — Fixed `window.location.origin` being computed during server render, causing Next.js hydration mismatch errors on all OAuth tool pages. The redirect URI is now set via `useEffect` on the client only.
 - **No Agents in Playground** — Fixed the agent dropdown showing no agents. The `/api/agents` endpoint returns an array directly, but the playground expected `data.agents`. Now handles both formats.
+- **CLI Shows No Agents** — Fixed the CLI `fetchAgents()` expecting `data.agents` from the API response, but the API returns a plain array. Now handles both formats.

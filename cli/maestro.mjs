@@ -147,7 +147,8 @@ async function apiFetch(endpoint, options = {}) {
 async function fetchAgents() {
   const res = await apiFetch("/api/agents");
   const data = await res.json();
-  return data.agents || [];
+  // API returns a plain array, but handle both formats for safety
+  return Array.isArray(data) ? data : data.agents || [];
 }
 
 async function fetchAgentDetails(agentId) {
