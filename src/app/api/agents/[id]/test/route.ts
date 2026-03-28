@@ -4,6 +4,7 @@ import { getApiKey } from "@/lib/get-api-key";
 import Anthropic from "@anthropic-ai/sdk";
 import type { StoredAgentDefinition } from "@/types/agent";
 import { executeTool, getToolDefinitionsForIds } from "@/lib/tool-executor";
+import type { ToolExecutionContext } from "@/lib/tool-executor";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -109,6 +110,20 @@ export async function POST(
         systemPrompt += `- **${mem.collection.name}** (ID: ${mem.collectionId}): ${mem.collection.description || "No description"}\n`;
       }
       systemPrompt += "\nUse memory_query to search for relevant information when the user asks about topics covered by these collections.\n";
+    }
+
+    // ── Load tool connections for MCP execution ────────────────────────
+
+    let toolExecContext: ToolExecutionContext | undefined;
+    try {
+      const settingsRow = await db.settings.findUnique({ where: { key: "tool_connections" } });
+      if (settingsRow?.value) {
+        const connections = JSON.parse(settingsRow.value);
+        const connectorMap = getDefaultConnectorMap();
+        toolExecContext = { connections, connectors: connectorMap };
+      }
+    } catch {
+      // If loading fails, continue without MCP context — tools will show helpful errors
     }
 
     // Tell the agent about its tools
@@ -364,8 +379,8 @@ export async function POST(
               const toolResults: Anthropic.ToolResultBlockParam[] = [];
 
               for (const block of toolUseBlocks) {
-                // Execute the tool for real
-                const result = await executeTool(block.name, block.input);
+                // Execute the tool for real (local or MCP)
+                const result = await executeTool(block.name, block.input, toolExecContext);
 
                 toolResults.push({
                   type: "tool_result",
@@ -454,4 +469,50 @@ export async function POST(
       { status: 500 }
     );
   }
+}
+
+// ── Default connector map (MCP endpoints by connector ID) ──────────────
+
+function getDefaultConnectorMap(): Record<string, { id: string; mcpEndpoint: string }> {
+  const connectors: Array<{ id: string; mcpEndpoint: string }> = [
+    { id: "github", mcpEndpoint: "https://api.githubcopilot.com/mcp/" },
+    { id: "slack", mcpEndpoint: "npx -y @modelcontextprotocol/server-slack" },
+    { id: "filesystem", mcpEndpoint: "npx -y @modelcontextprotocol/server-filesystem" },
+    { id: "postgres", mcpEndpoint: "npx -y @modelcontextprotocol/server-postgres" },
+    { id: "brave-search", mcpEndpoint: "npx -y @modelcontextprotocol/server-brave-search" },
+    { id: "google-drive", mcpEndpoint: "npx -y @modelcontextprotocol/server-gdrive" },
+    { id: "memory", mcpEndpoint: "npx -y @modelcontextprotocol/server-memory" },
+    { id: "puppeteer", mcpEndpoint: "npx -y @modelcontextprotocol/server-puppeteer" },
+    { id: "notion", mcpEndpoint: "npx -y @modelcontextprotocol/server-notion" },
+    { id: "discord", mcpEndpoint: "npx -y @modelcontextprotocol/server-discord" },
+    { id: "telegram", mcpEndpoint: "npx -y @modelcontextprotocol/server-telegram" },
+    { id: "outlook", mcpEndpoint: "npx -y @modelcontextprotocol/server-outlook" },
+    { id: "gmail", mcpEndpoint: "npx -y @modelcontextprotocol/server-gmail" },
+    { id: "google-calendar", mcpEndpoint: "npx -y @modelcontextprotocol/server-google-calendar" },
+    { id: "onedrive", mcpEndpoint: "npx -y @modelcontextprotocol/server-onedrive" },
+    { id: "context7", mcpEndpoint: "npx -y @upstash/context7-mcp" },
+    { id: "wikipedia", mcpEndpoint: "npx -y @modelcontextprotocol/server-wikipedia" },
+    { id: "stripe", mcpEndpoint: "npx -y @modelcontextprotocol/server-stripe" },
+    { id: "cloudflare", mcpEndpoint: "npx -y @modelcontextprotocol/server-cloudflare" },
+    { id: "airtable", mcpEndpoint: "npx -y @modelcontextprotocol/server-airtable" },
+    { id: "hubspot", mcpEndpoint: "npx -y @modelcontextprotocol/server-hubspot" },
+    { id: "salesforce", mcpEndpoint: "npx -y @modelcontextprotocol/server-salesforce" },
+    { id: "supabase", mcpEndpoint: "npx -y @modelcontextprotocol/server-supabase" },
+    { id: "mongodb", mcpEndpoint: "npx -y @modelcontextprotocol/server-mongodb" },
+    { id: "mysql", mcpEndpoint: "npx -y @modelcontextprotocol/server-mysql" },
+    { id: "figma", mcpEndpoint: "npx -y @modelcontextprotocol/server-figma" },
+    { id: "zapier", mcpEndpoint: "npx -y @modelcontextprotocol/server-zapier" },
+    { id: "canva", mcpEndpoint: "npx -y @modelcontextprotocol/server-canva" },
+    { id: "paypal", mcpEndpoint: "npx -y @modelcontextprotocol/server-paypal" },
+    { id: "asana", mcpEndpoint: "npx -y @modelcontextprotocol/server-asana" },
+    { id: "jira", mcpEndpoint: "npx -y @modelcontextprotocol/server-jira" },
+    { id: "confluence", mcpEndpoint: "npx -y @modelcontextprotocol/server-confluence" },
+    { id: "n8n", mcpEndpoint: "npx -y @modelcontextprotocol/server-n8n" },
+  ];
+
+  const map: Record<string, { id: string; mcpEndpoint: string }> = {};
+  for (const c of connectors) {
+    map[c.id] = c;
+  }
+  return map;
 }

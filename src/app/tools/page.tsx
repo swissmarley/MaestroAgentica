@@ -134,6 +134,7 @@ export default function ToolsPage() {
   const [oauthPending, setOauthPending] = useState<string | null>(null);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [isEditingConnection, setIsEditingConnection] = useState(false);
 
   useEffect(() => {
     fetchTools();
@@ -334,6 +335,8 @@ export default function ToolsPage() {
 
   // Initiate connection based on auth type
   const initiateConnect = (connector: McpConnector) => {
+    setIsEditingConnection(false);
+    setTestResult(null);
     switch (connector.authType) {
       case "oauth":
         handleOAuthConnect(connector);
@@ -507,11 +510,10 @@ export default function ToolsPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
+                          setIsEditingConnection(true);
                           setConnectDialog(connector);
-                          setConnectForm({
-                            apiKey: conn.apiKey ? conn.apiKey.slice(0, 8) + "..." : "",
-                            connectionString: conn.connectionString ? conn.connectionString.slice(0, 20) + "..." : "",
-                          });
+                          setConnectForm({ apiKey: "", connectionString: "" });
+                          setTestResult(null);
                         }}
                       >
                         <Settings className="h-3.5 w-3.5" />
@@ -549,31 +551,49 @@ export default function ToolsPage() {
       )}
 
       {/* API Key / Connection String Dialog */}
-      <Dialog open={!!connectDialog} onOpenChange={(open) => { if (!open) { setConnectDialog(null); setConnectForm({ apiKey: "", connectionString: "" }); setTestResult(null); } }}>
+      <Dialog open={!!connectDialog} onOpenChange={(open) => { if (!open) { setConnectDialog(null); setConnectForm({ apiKey: "", connectionString: "" }); setTestResult(null); setIsEditingConnection(false); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <div className={`rounded-md p-1.5 ${CATEGORY_COLORS[connectDialog?.category || "Custom"] || CATEGORY_COLORS.Custom}`}>
                 {connectDialog && <ConnectorIcon iconKey={connectDialog.icon} className="h-4 w-4" />}
               </div>
-              Connect {connectDialog?.name}
+              {isEditingConnection ? `Update ${connectDialog?.name}` : `Connect ${connectDialog?.name}`}
             </DialogTitle>
             <DialogDescription>
-              {connectDialog?.authType === "api_key"
-                ? `Enter your API key to connect to ${connectDialog?.name}. Your key is stored securely.`
-                : `Enter the connection string for your ${connectDialog?.name} instance.`}
+              {isEditingConnection
+                ? `Update your credentials for ${connectDialog?.name}. Enter a new key to replace the existing one.`
+                : connectDialog?.authType === "api_key"
+                  ? `Enter your API key to connect to ${connectDialog?.name}. Your key is stored securely.`
+                  : `Enter the connection string for your ${connectDialog?.name} instance.`}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Show current connection status when editing */}
+            {isEditingConnection && connectDialog && connections[connectDialog.id]?.connected && (
+              <div className="flex items-center gap-2 rounded-md bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 px-3 py-2 text-xs text-green-700 dark:text-green-300">
+                <Check className="h-3.5 w-3.5 shrink-0" />
+                <span>
+                  Currently connected
+                  {connections[connectDialog.id]?.connectedAt && (
+                    <> since {new Date(connections[connectDialog.id].connectedAt!).toLocaleDateString()}</>
+                  )}
+                  {connections[connectDialog.id]?.apiKey && (
+                    <> — Key: {connections[connectDialog.id].apiKey!.slice(0, 8)}...{connections[connectDialog.id].apiKey!.slice(-4)}</>
+                  )}
+                </span>
+              </div>
+            )}
+
             {connectDialog?.authType === "api_key" && (
               <div className="space-y-2">
-                <Label>API Key</Label>
+                <Label>{isEditingConnection ? "New API Key" : "API Key"}</Label>
                 <div className="relative">
                   <Key className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     type="password"
-                    placeholder="Enter your API key..."
+                    placeholder={isEditingConnection ? "Enter new API key to replace..." : "Enter your API key..."}
                     className="pl-9 font-mono text-sm"
                     value={connectForm.apiKey}
                     onChange={(e) => setConnectForm((p) => ({ ...p, apiKey: e.target.value }))}
@@ -616,7 +636,7 @@ export default function ToolsPage() {
 
             {connectDialog?.authType === "connection_string" && (
               <div className="space-y-2">
-                <Label>Connection String</Label>
+                <Label>{isEditingConnection ? "New Connection String" : "Connection String"}</Label>
                 <div className="relative">
                   <Link2 className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -647,7 +667,7 @@ export default function ToolsPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setConnectDialog(null); setConnectForm({ apiKey: "", connectionString: "" }); }}>
+            <Button variant="outline" onClick={() => { setConnectDialog(null); setConnectForm({ apiKey: "", connectionString: "" }); setIsEditingConnection(false); }}>
               Cancel
             </Button>
             <Button
@@ -663,9 +683,9 @@ export default function ToolsPage() {
               }
             >
               {connecting ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Connecting...</>
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> {isEditingConnection ? "Updating..." : "Connecting..."}</>
               ) : (
-                <><Plug className="h-4 w-4 mr-2" /> Connect</>
+                <><Plug className="h-4 w-4 mr-2" /> {isEditingConnection ? "Update" : "Connect"}</>
               )}
             </Button>
           </DialogFooter>

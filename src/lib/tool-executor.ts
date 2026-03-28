@@ -2,6 +2,17 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { getChromaClient } from "@/lib/chromadb";
 import { db } from "@/lib/db";
+// Dynamic import to avoid child_process issues during Next.js page collection
+async function callMcpToolDynamic(
+  mcpEndpoint: string,
+  connectorId: string,
+  toolName: string,
+  toolInput: Record<string, unknown>,
+  credentials: { apiKey?: string; connectionString?: string; oauthToken?: string }
+) {
+  const { callMcpTool } = await import("@/lib/mcp-client");
+  return callMcpTool(mcpEndpoint, connectorId, toolName, toolInput, credentials);
+}
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -270,25 +281,128 @@ const toolHandlers: Record<string, ToolHandler> = {
   },
 };
 
+// ── Tool-to-Connector Mapping ──────────────────────────────────────────
+
+/**
+ * Build a reverse map from tool names to connector IDs (lazy-initialized).
+ */
+let _toolToConnectorMap: Record<string, string> | null = null;
+
+function getToolToConnectorMap(): Record<string, string> {
+  if (!_toolToConnectorMap) {
+    _toolToConnectorMap = {};
+    for (const [connectorId, tools] of Object.entries(CONNECTOR_TOOLS)) {
+      for (const tool of tools) {
+        _toolToConnectorMap[tool.name] = connectorId;
+      }
+    }
+  }
+  return _toolToConnectorMap;
+}
+
+// ── Connection context for MCP tools ───────────────────────────────────
+
+export interface ToolConnectionInfo {
+  connected: boolean;
+  authType: string;
+  apiKey?: string;
+  connectionString?: string;
+  oauthToken?: string;
+}
+
+export interface McpConnectorInfo {
+  id: string;
+  mcpEndpoint: string;
+}
+
+export interface ToolExecutionContext {
+  /** Map of connector ID → connection credentials */
+  connections: Record<string, ToolConnectionInfo>;
+  /** Map of connector ID → MCP endpoint info */
+  connectors: Record<string, McpConnectorInfo>;
+}
+
 // ── Public API ──────────────────────────────────────────────────────────
 
 /**
  * Execute a tool by name with the given input.
- * Returns the tool's output or an error message if the tool is not supported.
+ * First tries local handlers (filesystem, memory), then routes to MCP servers.
  */
 export async function executeTool(
   toolName: string,
-  input: Record<string, unknown>
+  input: Record<string, unknown>,
+  context?: ToolExecutionContext
 ): Promise<ToolResult> {
+  // 1. Check local handlers first (filesystem, memory)
   const handler = toolHandlers[toolName];
   if (handler) {
     return handler(input);
   }
 
+  // 2. Try MCP execution via connector
+  const connectorId = getToolToConnectorMap()[toolName];
+  if (connectorId && context) {
+    const connection = context.connections[connectorId];
+    const connector = context.connectors[connectorId];
+
+    if (!connection?.connected) {
+      return {
+        output: JSON.stringify({
+          error: `Tool "${toolName}" requires the ${connectorId} connector to be connected.`,
+          hint: `Go to Tools page and connect ${connectorId} with the required credentials.`,
+        }),
+        isError: true,
+      };
+    }
+
+    if (!connector?.mcpEndpoint) {
+      return {
+        output: JSON.stringify({
+          error: `No MCP endpoint configured for connector ${connectorId}.`,
+        }),
+        isError: true,
+      };
+    }
+
+    // Call the MCP server
+    const mcpResult = await callMcpToolDynamic(
+      connector.mcpEndpoint,
+      connectorId,
+      toolName,
+      input,
+      {
+        apiKey: connection.apiKey,
+        connectionString: connection.connectionString,
+        oauthToken: connection.oauthToken,
+      }
+    );
+
+    // Convert MCP result to ToolResult
+    const outputText = mcpResult.content
+      .map((block) => block.text || JSON.stringify(block))
+      .join("\n");
+
+    return {
+      output: outputText,
+      isError: mcpResult.isError || false,
+    };
+  }
+
+  // 3. Tool not found anywhere
+  if (connectorId && !context) {
+    return {
+      output: JSON.stringify({
+        error: `Tool "${toolName}" requires the ${connectorId} connector. Ensure the tool is connected on the Tools page.`,
+        hint: "The tool connection could not be verified. Connect the tool and try again.",
+      }),
+      isError: true,
+    };
+  }
+
   return {
     output: JSON.stringify({
-      error: `Tool "${toolName}" is not available for direct execution in the playground.`,
-      hint: "This tool requires an MCP server connection. Configure the MCP endpoint in the agent's tool settings.",
+      error: `Tool "${toolName}" is not recognized.`,
+      hint: "This tool is not in the built-in catalog. Check the tool name or configure a custom MCP endpoint.",
     }),
     isError: true,
   };
@@ -299,6 +413,20 @@ export async function executeTool(
  */
 export function isExecutableTool(toolName: string): boolean {
   return toolName in toolHandlers;
+}
+
+/**
+ * Check if a tool exists in the connector catalog (may need MCP).
+ */
+export function isConnectorTool(toolName: string): boolean {
+  return toolName in getToolToConnectorMap();
+}
+
+/**
+ * Get the connector ID for a given tool name, if any.
+ */
+export function getConnectorIdForTool(toolName: string): string | undefined {
+  return getToolToConnectorMap()[toolName];
 }
 
 /**

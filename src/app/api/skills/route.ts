@@ -9,9 +9,16 @@ const PREBUILT_SKILLS = [
     name: "Code Review",
     description: "Thorough code review with focus on bugs, security, and best practices.",
     category: "Development",
+    version: "1.0.0",
+    triggers: ["code review", "review code", "review PR"],
     content: `---
 name: code-review
 description: Perform thorough code reviews focusing on correctness, security, and maintainability
+version: 1.0.0
+triggers:
+  - "code review"
+  - "review code"
+  - "review PR"
 type: skill
 ---
 
@@ -38,9 +45,16 @@ When reviewing code, follow this systematic approach:
     name: "API Designer",
     description: "Design RESTful APIs with proper patterns, validation, and documentation.",
     category: "Development",
+    version: "1.0.0",
+    triggers: ["design api", "api design", "REST API"],
     content: `---
 name: api-designer
 description: Design clean RESTful APIs with proper HTTP methods, status codes, and validation
+version: 1.0.0
+triggers:
+  - "design api"
+  - "api design"
+  - "REST API"
 type: skill
 ---
 
@@ -73,9 +87,16 @@ type: skill
     name: "Test Writer",
     description: "Write comprehensive test suites with proper coverage and edge cases.",
     category: "Testing",
+    version: "1.0.0",
+    triggers: ["write tests", "test writer", "create tests"],
     content: `---
 name: test-writer
 description: Write comprehensive tests covering happy paths, edge cases, and error scenarios
+version: 1.0.0
+triggers:
+  - "write tests"
+  - "test writer"
+  - "create tests"
 type: skill
 ---
 
@@ -106,9 +127,16 @@ Use descriptive test names: \`should [expected behavior] when [condition]\`
     name: "Documentation Writer",
     description: "Write clear, structured technical documentation and README files.",
     category: "Documentation",
+    version: "1.0.0",
+    triggers: ["write docs", "documentation", "write README"],
     content: `---
 name: docs-writer
 description: Write clear technical documentation following best practices
+version: 1.0.0
+triggers:
+  - "write docs"
+  - "documentation"
+  - "write README"
 type: skill
 ---
 
@@ -134,9 +162,16 @@ type: skill
     name: "SQL Expert",
     description: "Write optimized SQL queries with proper indexing and performance considerations.",
     category: "Data",
+    version: "1.0.0",
+    triggers: ["sql query", "optimize SQL", "database query"],
     content: `---
 name: sql-expert
 description: Write optimized SQL queries with proper indexing strategies and performance tuning
+version: 1.0.0
+triggers:
+  - "sql query"
+  - "optimize SQL"
+  - "database query"
 type: skill
 ---
 
@@ -161,9 +196,16 @@ type: skill
     name: "Security Auditor",
     description: "Audit code for security vulnerabilities following OWASP guidelines.",
     category: "Security",
+    version: "1.0.0",
+    triggers: ["security audit", "vulnerability scan", "OWASP check"],
     content: `---
 name: security-auditor
 description: Audit code for OWASP Top 10 vulnerabilities and security best practices
+version: 1.0.0
+triggers:
+  - "security audit"
+  - "vulnerability scan"
+  - "OWASP check"
 type: skill
 ---
 
@@ -193,9 +235,16 @@ type: skill
     name: "Refactoring Guide",
     description: "Identify and apply common refactoring patterns to improve code quality.",
     category: "Development",
+    version: "1.0.0",
+    triggers: ["refactor", "refactoring", "improve code quality"],
     content: `---
 name: refactoring-guide
 description: Apply systematic refactoring patterns to improve code quality without changing behavior
+version: 1.0.0
+triggers:
+  - "refactor"
+  - "refactoring"
+  - "improve code quality"
 type: skill
 ---
 
@@ -226,9 +275,16 @@ type: skill
     name: "Prompt Engineer",
     description: "Design effective prompts and system instructions for AI agents.",
     category: "AI",
+    version: "1.0.0",
+    triggers: ["prompt engineering", "design prompt", "system instructions"],
     content: `---
 name: prompt-engineer
 description: Design effective prompts and system instructions for AI agents
+version: 1.0.0
+triggers:
+  - "prompt engineering"
+  - "design prompt"
+  - "system instructions"
 type: skill
 ---
 
@@ -279,20 +335,25 @@ export async function POST(request: NextRequest) {
 
     // Validate skill format (should have frontmatter)
     const hasFrontmatter = content.trim().startsWith("---");
+    const kebabName = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
     const skill = {
       id: `custom_${Date.now()}`,
       name: name.trim(),
       description: description?.trim() || "",
       category: category?.trim() || "Custom",
+      version: body.version || "1.0.0",
+      triggers: body.triggers || [],
       content: hasFrontmatter ? content : `---
-name: ${name.trim().toLowerCase().replace(/\s+/g, "-")}
+name: ${kebabName}
 description: ${description?.trim() || name.trim()}
+version: ${body.version || "1.0.0"}
 type: skill
 ---
 
 ${content}`,
       isCustom: true,
+      packageName: kebabName,
     };
 
     return NextResponse.json(skill, { status: 201 });

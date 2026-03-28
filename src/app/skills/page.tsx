@@ -21,6 +21,10 @@ import {
   Info,
   Download,
   Upload,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  Package,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
@@ -51,7 +55,32 @@ interface Skill {
   description: string;
   category: string;
   content: string;
+  version?: string;
+  triggers?: string[];
   isCustom?: boolean;
+  isImported?: boolean;
+  packageName?: string;
+}
+
+interface ValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+  compatibility?: {
+    claudeCode: boolean;
+    maestroAgentica: boolean;
+    genericRuntime: boolean;
+  };
+  metadata?: {
+    name: string;
+    description: string;
+    version: string;
+    triggers: string[];
+    hasScripts: boolean;
+    hasSamples: boolean;
+    hasTests: boolean;
+    hasReadme: boolean;
+  };
 }
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
@@ -96,7 +125,12 @@ export default function SkillsPage() {
   const [generating, setGenerating] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [importWarnings, setImportWarnings] = useState<string[]>([]);
+  const [validating, setValidating] = useState(false);
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+  const [validationOpen, setValidationOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const validateInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchSkills();
@@ -118,27 +152,29 @@ export default function SkillsPage() {
 
   const handleExportSkill = async (skill: Skill) => {
     try {
-      const JSZip = (await import("jszip")).default;
-      const zip = new JSZip();
+      const res = await fetch("/api/skills/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: skill.name,
+          description: skill.description,
+          content: skill.content,
+          category: skill.category,
+          version: skill.version,
+          triggers: skill.triggers,
+        }),
+      });
 
-      // Add skill metadata as JSON
-      zip.file("skill.json", JSON.stringify({
-        id: skill.id,
-        name: skill.name,
-        description: skill.description,
-        category: skill.category,
-        exportedAt: new Date().toISOString(),
-        version: "1.0.0",
-      }, null, 2));
+      if (!res.ok) {
+        throw new Error("Export failed");
+      }
 
-      // Add skill content as markdown
-      zip.file("skill.md", skill.content);
-
-      const blob = await zip.generateAsync({ type: "blob" });
+      const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${skill.name.toLowerCase().replace(/\s+/g, "-")}.zip`;
+      const slug = skill.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      a.download = `${slug}.zip`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -157,58 +193,79 @@ export default function SkillsPage() {
 
     setImporting(true);
     setImportError(null);
+    setImportWarnings([]);
 
     try {
-      const JSZip = (await import("jszip")).default;
-      const zip = await JSZip.loadAsync(file);
+      const formData = new FormData();
+      formData.append("file", file);
 
-      // Validate required files
-      const metaFile = zip.file("skill.json");
-      const contentFile = zip.file("skill.md");
-
-      if (!metaFile || !contentFile) {
-        throw new Error("Invalid skill package. Must contain skill.json and skill.md files.");
-      }
-
-      const metaJson = await metaFile.async("string");
-      const content = await contentFile.async("string");
-
-      let meta: { name?: string; description?: string; category?: string };
-      try {
-        meta = JSON.parse(metaJson);
-      } catch {
-        throw new Error("Invalid skill.json — could not parse metadata.");
-      }
-
-      if (!meta.name?.trim()) {
-        throw new Error("Skill name is missing in skill.json.");
-      }
-
-      // Create the imported skill
-      const res = await fetch("/api/skills", {
+      const res = await fetch("/api/skills/import", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: meta.name,
-          description: meta.description || "",
-          content: content,
-          category: meta.category || "Custom",
-        }),
+        body: formData,
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        throw new Error("Failed to create imported skill.");
+        const details = data.details?.join("; ") || data.error || "Failed to import skill.";
+        throw new Error(details);
       }
 
-      const created = await res.json();
-      setSkills((prev) => [...prev, created]);
+      // Show warnings if any
+      if (data.validation?.warnings?.length > 0) {
+        setImportWarnings(data.validation.warnings);
+      }
+
+      setSkills((prev) => [...prev, data.skill]);
     } catch (err) {
       setImportError(err instanceof Error ? err.message : "Failed to import skill.");
     } finally {
       setImporting(false);
-      // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleValidatePackage = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setValidating(true);
+    setValidationResult(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/skills/validate", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setValidationResult(data);
+      } else {
+        setValidationResult({
+          valid: false,
+          errors: [data.error || "Validation failed"],
+          warnings: [],
+        });
+      }
+      setValidationOpen(true);
+    } catch (err) {
+      setValidationResult({
+        valid: false,
+        errors: [err instanceof Error ? err.message : "Validation failed"],
+        warnings: [],
+      });
+      setValidationOpen(true);
+    } finally {
+      setValidating(false);
+      if (validateInputRef.current) {
+        validateInputRef.current.value = "";
       }
     }
   };
@@ -239,9 +296,14 @@ export default function SkillsPage() {
     if (!generatorPrompt.trim()) return;
     setGenerating(true);
 
+    const kebabName = generatorPrompt.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 30);
+
     const generatedContent = `---
-name: ${generatorPrompt.toLowerCase().replace(/\s+/g, "-").slice(0, 30)}
+name: ${kebabName}
 description: ${generatorPrompt}
+version: 1.0.0
+triggers:
+  - "${generatorPrompt.toLowerCase()}"
 type: skill
 ---
 
@@ -303,10 +365,17 @@ Based on the description: "${generatorPrompt}"
 
   return (
     <div className="flex flex-col gap-6 p-6 lg:p-8">
-      <Header title="Skills" description="Browse and create skills following the Claude Code Skills standard">
+      <Header title="Skills" description="Browse and create interoperable skills compatible with Claude Code and other agent runtimes">
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setGeneratorOpen(true)}>
             <Zap className="mr-2 h-4 w-4" /> Skill Creator
+          </Button>
+          <Button variant="outline" onClick={() => validateInputRef.current?.click()} disabled={validating}>
+            {validating ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Validating...</>
+            ) : (
+              <><Package className="mr-2 h-4 w-4" /> Validate Package</>
+            )}
           </Button>
           <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={importing}>
             {importing ? (
@@ -325,15 +394,38 @@ Based on the description: "${generatorPrompt}"
             onChange={handleImportSkill}
             className="hidden"
           />
+          <input
+            ref={validateInputRef}
+            type="file"
+            accept=".zip"
+            onChange={handleValidatePackage}
+            className="hidden"
+          />
         </div>
       </Header>
 
       {/* Import error */}
       {importError && (
         <div className="rounded-md bg-destructive/10 border border-destructive/20 px-4 py-2 text-sm text-destructive flex items-center gap-2">
-          <Info className="h-4 w-4 shrink-0" />
+          <XCircle className="h-4 w-4 shrink-0" />
           {importError}
           <button onClick={() => setImportError(null)} className="ml-auto text-xs underline">Dismiss</button>
+        </div>
+      )}
+
+      {/* Import warnings */}
+      {importWarnings.length > 0 && (
+        <div className="rounded-md bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-4 py-2 text-sm text-amber-700 dark:text-amber-400">
+          <div className="flex items-center gap-2 mb-1">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <span className="font-medium">Import completed with warnings:</span>
+            <button onClick={() => setImportWarnings([])} className="ml-auto text-xs underline">Dismiss</button>
+          </div>
+          <ul className="list-disc list-inside text-xs space-y-0.5 ml-6">
+            {importWarnings.map((w, i) => (
+              <li key={i}>{w}</li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -341,7 +433,7 @@ Based on the description: "${generatorPrompt}"
       <div className="rounded-md bg-muted/50 border px-4 py-3 flex gap-2">
         <Info className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
         <p className="text-xs text-muted-foreground">
-          Skills are assigned per-agent. Browse available skills here, then go to an agent&apos;s configuration to assign specific skills to it.
+          Skills follow the SKILL.md standard and are interoperable with Claude Code, GitHub, and other compatible agent runtimes. Import .zip packages from any source or export for use elsewhere.
         </p>
       </div>
 
@@ -386,15 +478,36 @@ Based on the description: "${generatorPrompt}"
                     </div>
                     <div>
                       <CardTitle className="text-sm">{skill.name}</CardTitle>
-                      <Badge variant="outline" className="text-[10px] mt-1">
-                        {skill.category}
-                      </Badge>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <Badge variant="outline" className="text-[10px]">
+                          {skill.category}
+                        </Badge>
+                        {skill.version && (
+                          <Badge variant="secondary" className="text-[10px]">
+                            v{skill.version}
+                          </Badge>
+                        )}
+                        {skill.isImported && (
+                          <Badge variant="secondary" className="text-[10px] bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400">
+                            Imported
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
                 <CardDescription className="text-xs mt-2">
                   {skill.description}
                 </CardDescription>
+                {skill.triggers && skill.triggers.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {skill.triggers.map((t, i) => (
+                      <span key={i} className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                        {t}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </CardHeader>
 
               <CardContent className="flex-1 flex flex-col justify-end gap-3">
@@ -466,7 +579,7 @@ Based on the description: "${generatorPrompt}"
           <DialogHeader>
             <DialogTitle>Create Custom Skill</DialogTitle>
             <DialogDescription>
-              Skills follow the Claude Code Skills filesystem-based standard with markdown frontmatter.
+              Skills follow the SKILL.md standard with YAML frontmatter. Exported skills are compatible with Claude Code and other agent runtimes.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -509,9 +622,9 @@ Based on the description: "${generatorPrompt}"
               />
             </div>
             <div className="space-y-2">
-              <Label>Skill Content (Markdown with frontmatter)</Label>
+              <Label>Skill Content (SKILL.md with YAML frontmatter)</Label>
               <Textarea
-                placeholder={`---\nname: my-skill\ndescription: What this skill does\ntype: skill\n---\n\n# My Skill\n\nInstructions and guidelines...`}
+                placeholder={`---\nname: my-skill\ndescription: What this skill does\nversion: 1.0.0\ntriggers:\n  - "my trigger"\ntype: skill\n---\n\n# My Skill\n\nInstructions and guidelines...`}
                 className="font-mono text-sm"
                 rows={14}
                 value={newSkill.content}
@@ -568,6 +681,109 @@ Based on the description: "${generatorPrompt}"
               )}
               Generate Skill
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Validation Result Dialog */}
+      <Dialog open={validationOpen} onOpenChange={setValidationOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              Package Validation
+            </DialogTitle>
+            <DialogDescription>
+              Compatibility check against the SKILL.md standard.
+            </DialogDescription>
+          </DialogHeader>
+          {validationResult && (
+            <div className="space-y-4">
+              {/* Overall status */}
+              <div className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${
+                validationResult.valid
+                  ? "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400"
+                  : "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400"
+              }`}>
+                {validationResult.valid ? (
+                  <CheckCircle2 className="h-4 w-4" />
+                ) : (
+                  <XCircle className="h-4 w-4" />
+                )}
+                {validationResult.valid ? "Package is valid and ready to use" : "Package has validation errors"}
+              </div>
+
+              {/* Metadata */}
+              {validationResult.metadata && (
+                <div className="rounded-md border p-3 space-y-1.5">
+                  <div className="text-xs font-medium text-muted-foreground">Package Details</div>
+                  <div className="grid grid-cols-2 gap-1 text-xs">
+                    <span className="text-muted-foreground">Name:</span>
+                    <span className="font-mono">{validationResult.metadata.name || "—"}</span>
+                    <span className="text-muted-foreground">Version:</span>
+                    <span>{validationResult.metadata.version || "—"}</span>
+                    <span className="text-muted-foreground">Scripts:</span>
+                    <span>{validationResult.metadata.hasScripts ? "Yes" : "No"}</span>
+                    <span className="text-muted-foreground">Samples:</span>
+                    <span>{validationResult.metadata.hasSamples ? "Yes" : "No"}</span>
+                    <span className="text-muted-foreground">Tests:</span>
+                    <span>{validationResult.metadata.hasTests ? "Yes" : "No"}</span>
+                    <span className="text-muted-foreground">README:</span>
+                    <span>{validationResult.metadata.hasReadme ? "Yes" : "No"}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Compatibility */}
+              {validationResult.compatibility && (
+                <div className="rounded-md border p-3 space-y-1.5">
+                  <div className="text-xs font-medium text-muted-foreground">Runtime Compatibility</div>
+                  <div className="space-y-1">
+                    {[
+                      { label: "Claude Code", ok: validationResult.compatibility.claudeCode },
+                      { label: "Maestro Agentica", ok: validationResult.compatibility.maestroAgentica },
+                      { label: "Generic Runtime", ok: validationResult.compatibility.genericRuntime },
+                    ].map(({ label, ok }) => (
+                      <div key={label} className="flex items-center gap-2 text-xs">
+                        {ok ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                        ) : (
+                          <XCircle className="h-3.5 w-3.5 text-red-500" />
+                        )}
+                        {label}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Errors */}
+              {validationResult.errors.length > 0 && (
+                <div className="space-y-1">
+                  <div className="text-xs font-medium text-red-600 dark:text-red-400">Errors</div>
+                  <ul className="list-disc list-inside text-xs text-red-600 dark:text-red-400 space-y-0.5">
+                    {validationResult.errors.map((e, i) => (
+                      <li key={i}>{e}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Warnings */}
+              {validationResult.warnings.length > 0 && (
+                <div className="space-y-1">
+                  <div className="text-xs font-medium text-amber-600 dark:text-amber-400">Warnings</div>
+                  <ul className="list-disc list-inside text-xs text-amber-600 dark:text-amber-400 space-y-0.5">
+                    {validationResult.warnings.map((w, i) => (
+                      <li key={i}>{w}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setValidationOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

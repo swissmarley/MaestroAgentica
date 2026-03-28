@@ -28,7 +28,7 @@ const DEFAULT_CONNECTORS = [
     category: "Communication",
     authType: "oauth" as const,
     authUrl: "https://slack.com/oauth/v2/authorize",
-    mcpEndpoint: "npx -y @anthropic/mcp-server-slack",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-slack",
     status: "available" as const,
     tools: [
       "send_message", "search_messages", "list_channels",
@@ -42,7 +42,7 @@ const DEFAULT_CONNECTORS = [
     icon: "folder",
     category: "System",
     authType: "none" as const,
-    mcpEndpoint: "npx -y @anthropic/mcp-server-filesystem",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-filesystem",
     status: "available" as const,
     tools: [
       "read_file", "write_file", "list_directory",
@@ -56,7 +56,7 @@ const DEFAULT_CONNECTORS = [
     icon: "database",
     category: "Data",
     authType: "connection_string" as const,
-    mcpEndpoint: "npx -y @anthropic/mcp-server-postgres",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-postgres",
     status: "available" as const,
     tools: [
       "query", "list_tables", "describe_table",
@@ -70,7 +70,7 @@ const DEFAULT_CONNECTORS = [
     icon: "search",
     category: "Search",
     authType: "api_key" as const,
-    mcpEndpoint: "npx -y @anthropic/mcp-server-brave-search",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-brave-search",
     status: "available" as const,
     tools: [
       "brave_web_search", "brave_local_search",
@@ -84,7 +84,7 @@ const DEFAULT_CONNECTORS = [
     category: "Productivity",
     authType: "oauth" as const,
     authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
-    mcpEndpoint: "npx -y @anthropic/mcp-server-gdrive",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-gdrive",
     status: "available" as const,
     tools: [
       "search_files", "read_file", "list_files",
@@ -97,7 +97,7 @@ const DEFAULT_CONNECTORS = [
     icon: "brain",
     category: "AI",
     authType: "none" as const,
-    mcpEndpoint: "npx -y @anthropic/mcp-server-memory",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-memory",
     status: "available" as const,
     tools: [
       "create_entities", "create_relations", "search_nodes",
@@ -111,7 +111,7 @@ const DEFAULT_CONNECTORS = [
     icon: "globe",
     category: "Automation",
     authType: "none" as const,
-    mcpEndpoint: "npx -y @anthropic/mcp-server-puppeteer",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-puppeteer",
     status: "available" as const,
     tools: [
       "navigate", "screenshot", "click",
@@ -129,7 +129,7 @@ const DEFAULT_CONNECTORS = [
     category: "Communication",
     authType: "oauth" as const,
     authUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-    mcpEndpoint: "npx -y @anthropic/mcp-server-outlook",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-outlook",
     status: "available" as const,
     tools: [
       "send_email", "read_inbox", "search_emails",
@@ -144,7 +144,7 @@ const DEFAULT_CONNECTORS = [
     category: "Productivity",
     authType: "oauth" as const,
     authUrl: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
-    mcpEndpoint: "npx -y @anthropic/mcp-server-onedrive",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-onedrive",
     status: "available" as const,
     tools: [
       "list_files", "upload_file", "download_file",
@@ -159,7 +159,7 @@ const DEFAULT_CONNECTORS = [
     category: "Communication",
     authType: "oauth" as const,
     authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
-    mcpEndpoint: "npx -y @anthropic/mcp-server-gmail",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-gmail",
     status: "available" as const,
     tools: [
       "send_email", "read_inbox", "search_emails",
@@ -174,7 +174,7 @@ const DEFAULT_CONNECTORS = [
     category: "Productivity",
     authType: "oauth" as const,
     authUrl: "https://accounts.google.com/o/oauth2/v2/auth",
-    mcpEndpoint: "npx -y @anthropic/mcp-server-google-calendar",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-google-calendar",
     status: "available" as const,
     tools: [
       "list_events", "create_event", "update_event",
@@ -189,7 +189,7 @@ const DEFAULT_CONNECTORS = [
     category: "Productivity",
     authType: "oauth" as const,
     authUrl: "https://api.notion.com/v1/oauth/authorize",
-    mcpEndpoint: "npx -y @anthropic/mcp-server-notion",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-notion",
     status: "available" as const,
     tools: [
       "search_pages", "read_page", "create_page",
@@ -203,7 +203,7 @@ const DEFAULT_CONNECTORS = [
     icon: "discord",
     category: "Communication",
     authType: "api_key" as const,
-    mcpEndpoint: "npx -y @anthropic/mcp-server-discord",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-discord",
     status: "available" as const,
     tools: [
       "send_message", "read_messages", "list_channels",
@@ -217,7 +217,7 @@ const DEFAULT_CONNECTORS = [
     icon: "telegram",
     category: "Communication",
     authType: "api_key" as const,
-    mcpEndpoint: "npx -y @anthropic/mcp-server-telegram",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-telegram",
     status: "available" as const,
     tools: [
       "send_message", "get_updates", "send_photo",
@@ -231,7 +231,7 @@ const DEFAULT_CONNECTORS = [
     icon: "airtable",
     category: "Productivity",
     authType: "api_key" as const,
-    mcpEndpoint: "npx -y @anthropic/mcp-server-airtable",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-airtable",
     status: "available" as const,
     tools: [
       "list_records", "create_record", "update_record",
@@ -246,7 +246,7 @@ const DEFAULT_CONNECTORS = [
     category: "CRM",
     authType: "oauth" as const,
     authUrl: "https://app.hubspot.com/oauth/authorize",
-    mcpEndpoint: "npx -y @anthropic/mcp-server-hubspot",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-hubspot",
     status: "available" as const,
     tools: [
       "list_contacts", "create_contact", "update_contact",
@@ -261,7 +261,7 @@ const DEFAULT_CONNECTORS = [
     category: "CRM",
     authType: "oauth" as const,
     authUrl: "https://login.salesforce.com/services/oauth2/authorize",
-    mcpEndpoint: "npx -y @anthropic/mcp-server-salesforce",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-salesforce",
     status: "available" as const,
     tools: [
       "query_soql", "create_record", "update_record",
@@ -275,7 +275,7 @@ const DEFAULT_CONNECTORS = [
     icon: "supabase",
     category: "Data",
     authType: "api_key" as const,
-    mcpEndpoint: "npx -y @anthropic/mcp-server-supabase",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-supabase",
     status: "available" as const,
     tools: [
       "query_table", "insert_rows", "update_rows",
@@ -289,7 +289,7 @@ const DEFAULT_CONNECTORS = [
     icon: "mongodb",
     category: "Data",
     authType: "connection_string" as const,
-    mcpEndpoint: "npx -y @anthropic/mcp-server-mongodb",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-mongodb",
     status: "available" as const,
     tools: [
       "find_documents", "insert_document", "update_document",
@@ -303,7 +303,7 @@ const DEFAULT_CONNECTORS = [
     icon: "mysql",
     category: "Data",
     authType: "connection_string" as const,
-    mcpEndpoint: "npx -y @anthropic/mcp-server-mysql",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-mysql",
     status: "available" as const,
     tools: [
       "query", "list_tables", "describe_table",
@@ -318,7 +318,7 @@ const DEFAULT_CONNECTORS = [
     category: "Design",
     authType: "oauth" as const,
     authUrl: "https://www.figma.com/oauth",
-    mcpEndpoint: "npx -y @anthropic/mcp-server-figma",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-figma",
     status: "available" as const,
     tools: [
       "get_file", "get_components", "get_styles",
@@ -332,7 +332,7 @@ const DEFAULT_CONNECTORS = [
     icon: "zapier",
     category: "Automation",
     authType: "api_key" as const,
-    mcpEndpoint: "npx -y @anthropic/mcp-server-zapier",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-zapier",
     status: "available" as const,
     tools: [
       "list_actions", "execute_action", "get_action_status",
@@ -346,7 +346,7 @@ const DEFAULT_CONNECTORS = [
     icon: "cloudflare",
     category: "Infrastructure",
     authType: "api_key" as const,
-    mcpEndpoint: "npx -y @anthropic/mcp-server-cloudflare",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-cloudflare",
     status: "available" as const,
     tools: [
       "list_zones", "create_dns_record", "list_workers",
@@ -361,7 +361,7 @@ const DEFAULT_CONNECTORS = [
     category: "Design",
     authType: "oauth" as const,
     authUrl: "https://www.canva.com/api/oauth/authorize",
-    mcpEndpoint: "npx -y @anthropic/mcp-server-canva",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-canva",
     status: "available" as const,
     tools: [
       "create_design", "list_templates", "export_design",
@@ -375,7 +375,7 @@ const DEFAULT_CONNECTORS = [
     icon: "stripe",
     category: "Finance",
     authType: "api_key" as const,
-    mcpEndpoint: "npx -y @anthropic/mcp-server-stripe",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-stripe",
     status: "available" as const,
     tools: [
       "list_customers", "create_payment_intent", "list_subscriptions",
@@ -390,7 +390,7 @@ const DEFAULT_CONNECTORS = [
     category: "Finance",
     authType: "oauth" as const,
     authUrl: "https://www.paypal.com/signin/authorize",
-    mcpEndpoint: "npx -y @anthropic/mcp-server-paypal",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-paypal",
     status: "available" as const,
     tools: [
       "create_order", "capture_payment", "list_transactions",
@@ -405,7 +405,7 @@ const DEFAULT_CONNECTORS = [
     category: "Project Management",
     authType: "oauth" as const,
     authUrl: "https://app.asana.com/-/oauth_authorize",
-    mcpEndpoint: "npx -y @anthropic/mcp-server-asana",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-asana",
     status: "available" as const,
     tools: [
       "list_tasks", "create_task", "update_task",
@@ -420,7 +420,7 @@ const DEFAULT_CONNECTORS = [
     category: "Project Management",
     authType: "oauth" as const,
     authUrl: "https://auth.atlassian.com/authorize",
-    mcpEndpoint: "npx -y @anthropic/mcp-server-jira",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-jira",
     status: "available" as const,
     tools: [
       "search_issues", "create_issue", "update_issue",
@@ -435,7 +435,7 @@ const DEFAULT_CONNECTORS = [
     category: "Project Management",
     authType: "oauth" as const,
     authUrl: "https://auth.atlassian.com/authorize",
-    mcpEndpoint: "npx -y @anthropic/mcp-server-confluence",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-confluence",
     status: "available" as const,
     tools: [
       "search_content", "get_page", "create_page",
@@ -449,7 +449,7 @@ const DEFAULT_CONNECTORS = [
     icon: "wikipedia",
     category: "Search",
     authType: "none" as const,
-    mcpEndpoint: "npx -y @anthropic/mcp-server-wikipedia",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-wikipedia",
     status: "available" as const,
     tools: [
       "search_articles", "get_article", "get_summary",
@@ -476,7 +476,7 @@ const DEFAULT_CONNECTORS = [
     icon: "n8n",
     category: "Automation",
     authType: "api_key" as const,
-    mcpEndpoint: "npx -y @anthropic/mcp-server-n8n",
+    mcpEndpoint: "npx -y @modelcontextprotocol/server-n8n",
     status: "available" as const,
     tools: [
       "trigger_workflow", "list_workflows", "get_execution",
