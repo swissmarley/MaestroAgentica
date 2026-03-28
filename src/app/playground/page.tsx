@@ -441,12 +441,29 @@ export default function PlaygroundPage() {
           </div>
         );
       }
-      // Render inline bold and italic
-      const formatted = part
-        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-        .replace(/\*(.*?)\*/g, "<em>$1</em>")
-        .replace(/`([^`]+)`/g, '<code class="text-xs bg-muted rounded px-1 py-0.5 font-mono">$1</code>');
-      return <span key={i} className="whitespace-pre-wrap break-words" dangerouslySetInnerHTML={{ __html: formatted }} />;
+      // Render inline bold, italic, and inline code safely
+      const tokens: React.ReactNode[] = [];
+      const regex = /(\*\*.*?\*\*|\*.*?\*|`[^`]+`)/g;
+      let lastIndex = 0;
+      let match: RegExpExecArray | null;
+      while ((match = regex.exec(part)) !== null) {
+        if (match.index > lastIndex) {
+          tokens.push(part.slice(lastIndex, match.index));
+        }
+        const token = match[0];
+        if (token.startsWith("**") && token.endsWith("**")) {
+          tokens.push(<strong key={`${i}-${match.index}`}>{token.slice(2, -2)}</strong>);
+        } else if (token.startsWith("*") && token.endsWith("*")) {
+          tokens.push(<em key={`${i}-${match.index}`}>{token.slice(1, -1)}</em>);
+        } else if (token.startsWith("`") && token.endsWith("`")) {
+          tokens.push(<code key={`${i}-${match.index}`} className="text-xs bg-muted rounded px-1 py-0.5 font-mono">{token.slice(1, -1)}</code>);
+        }
+        lastIndex = regex.lastIndex;
+      }
+      if (lastIndex < part.length) {
+        tokens.push(part.slice(lastIndex));
+      }
+      return <span key={i} className="whitespace-pre-wrap break-words">{tokens}</span>;
     });
   };
 

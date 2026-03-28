@@ -34,23 +34,10 @@ export async function POST(request: NextRequest) {
     const config = oauthConfigs[connectorId];
 
     if (!config) {
-      // If no stored config, the token exchange can't proceed server-side.
-      // Store the authorization code and let the client complete the flow.
-      // For now, we store the code as a token placeholder to indicate successful auth.
-      const tokenData = {
-        access_token: `auth_code_${code.slice(0, 8)}`,
-        token_type: "Bearer",
-        expires_in: 3600,
-        refresh_token: null,
-        scope: "",
-        obtained_at: new Date().toISOString(),
-        connector_id: connectorId,
-      };
-
-      // Persist the token in settings
-      await storeToken(connectorId, tokenData);
-
-      return NextResponse.json(tokenData);
+      return NextResponse.json(
+        { error: "OAuth configuration not found for this connector. Please configure OAuth credentials (client ID, client secret, token URL) before connecting." },
+        { status: 400 }
+      );
     }
 
     // Perform real token exchange with the provider

@@ -206,9 +206,15 @@ export default function ToolsPage() {
     const authorizeUrl = `/tools/oauth?connector=${encodeURIComponent(connector.id)}&name=${encodeURIComponent(connector.name)}`;
     const popup = window.open(authorizeUrl, `oauth_${connector.id}`, "width=500,height=680,scrollbars=yes");
 
+    if (!popup) {
+      setOauthPending(null);
+      alert("Popup was blocked by the browser. Please allow popups for this site and try again.");
+      return;
+    }
+
     // If user closes popup without authorizing, clear pending state
     const checkClosed = setInterval(() => {
-      if (popup && popup.closed) {
+      if (popup.closed) {
         clearInterval(checkClosed);
         // Small delay to allow postMessage to arrive first
         setTimeout(() => {
