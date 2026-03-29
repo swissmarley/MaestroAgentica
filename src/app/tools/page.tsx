@@ -5,14 +5,11 @@ import {
   Wrench,
   Plus,
   Search,
-  Github,
-  MessageSquare,
   FolderOpen,
   Database,
   Cloud,
   Brain,
   Monitor,
-  ExternalLink,
   Check,
   Loader2,
   Plug,
@@ -25,7 +22,6 @@ import {
   Unlink,
   Settings,
   Shield,
-  X,
 } from "lucide-react";
 import { Header } from "@/components/layout/header";
 import { Button } from "@/components/ui/button";
@@ -49,6 +45,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { CONNECTOR_ICON_MAP } from "@/components/icons/connector-icons";
 
 interface McpConnector {
   id: string;
@@ -74,9 +71,8 @@ interface ToolConnection {
 
 type ConnectionMap = Record<string, ToolConnection>;
 
-const ICON_MAP: Record<string, React.ReactNode> = {
-  github: <Github className="h-5 w-5" />,
-  slack: <MessageSquare className="h-5 w-5" />,
+// Fallback Lucide icons for connectors that don't have brand SVGs
+const LUCIDE_ICON_MAP: Record<string, React.ReactNode> = {
   folder: <FolderOpen className="h-5 w-5" />,
   database: <Database className="h-5 w-5" />,
   search: <Search className="h-5 w-5" />,
@@ -84,6 +80,18 @@ const ICON_MAP: Record<string, React.ReactNode> = {
   brain: <Brain className="h-5 w-5" />,
   globe: <Monitor className="h-5 w-5" />,
 };
+
+function ConnectorIcon({ iconKey, className = "h-5 w-5" }: { iconKey: string; className?: string }) {
+  const BrandIcon = CONNECTOR_ICON_MAP[iconKey];
+  if (BrandIcon) {
+    return <BrandIcon className={className} />;
+  }
+  const lucideIcon = LUCIDE_ICON_MAP[iconKey];
+  if (lucideIcon) {
+    return <>{lucideIcon}</>;
+  }
+  return <Wrench className={className} />;
+}
 
 const CATEGORY_COLORS: Record<string, string> = {
   Development: "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300",
@@ -95,6 +103,11 @@ const CATEGORY_COLORS: Record<string, string> = {
   AI: "bg-pink-100 dark:bg-pink-900/50 text-pink-700 dark:text-pink-300",
   Automation: "bg-cyan-100 dark:bg-cyan-900/50 text-cyan-700 dark:text-cyan-300",
   Custom: "bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300",
+  CRM: "bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300",
+  Design: "bg-fuchsia-100 dark:bg-fuchsia-900/50 text-fuchsia-700 dark:text-fuchsia-300",
+  Finance: "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300",
+  "Project Management": "bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300",
+  Infrastructure: "bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300",
 };
 
 const AUTH_LABELS: Record<string, string> = {
@@ -119,11 +132,32 @@ export default function ToolsPage() {
   const [connectForm, setConnectForm] = useState({ apiKey: "", connectionString: "" });
   const [connecting, setConnecting] = useState(false);
   const [oauthPending, setOauthPending] = useState<string | null>(null);
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [isEditingConnection, setIsEditingConnection] = useState(false);
 
   useEffect(() => {
     fetchTools();
     loadConnections();
   }, []);
+
+  // Listen for OAuth postMessage from popup
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === "oauth_complete") {
+        const { connectorId, success, tokenData } = event.data;
+        if (success) {
+          completeOAuth(connectorId, tokenData);
+        } else {
+          // User denied — just clear pending state
+          setOauthPending(null);
+        }
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  });
 
   const fetchTools = async () => {
     try {
@@ -165,49 +199,47 @@ export default function ToolsPage() {
     } catch { /* ignore */ }
   }, []);
 
-  // Handle OAuth flow
-  const handleOAuthConnect = async (connector: McpConnector) => {
+  // Handle OAuth flow — opens our own authorize page in a popup
+  const handleOAuthConnect = (connector: McpConnector) => {
     setOauthPending(connector.id);
 
-    // Open OAuth popup
-    if (connector.authUrl) {
-      const redirectUri = `${window.location.origin}/api/tools/callback`;
-      const oauthUrl = `${connector.authUrl}?client_id=maestro_agentica&redirect_uri=${encodeURIComponent(redirectUri)}&scope=read,write&state=${connector.id}`;
-      const popup = window.open(oauthUrl, `oauth_${connector.id}`, "width=600,height=700,scrollbars=yes");
+    const authorizeUrl = `/tools/oauth?connector=${encodeURIComponent(connector.id)}&name=${encodeURIComponent(connector.name)}`;
+    const popup = window.open(authorizeUrl, `oauth_${connector.id}`, "width=500,height=680,scrollbars=yes");
 
-      // Poll for popup close (simulated OAuth completion)
-      const checkClosed = setInterval(() => {
-        if (popup && popup.closed) {
-          clearInterval(checkClosed);
-          completeOAuth(connector.id);
-        }
-      }, 500);
-
-      // Auto-complete after 5s if popup is still open (simulated)
-      setTimeout(() => {
-        clearInterval(checkClosed);
-        if (popup && !popup.closed) popup.close();
-        completeOAuth(connector.id);
-      }, 5000);
-    } else {
-      // No auth URL, simulate quick connection
-      await new Promise((r) => setTimeout(r, 1500));
-      completeOAuth(connector.id);
+    if (!popup) {
+      setOauthPending(null);
+      alert("Popup was blocked by the browser. Please allow popups for this site and try again.");
+      return;
     }
+
+    // If user closes popup without authorizing, clear pending state
+    const checkClosed = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(checkClosed);
+        // Small delay to allow postMessage to arrive first
+        setTimeout(() => {
+          setOauthPending((current) => (current === connector.id ? null : current));
+        }, 500);
+      }
+    }, 500);
   };
 
-  const completeOAuth = (connectorId: string) => {
+  const completeOAuth = (connectorId: string, tokenData?: { accessToken?: string; refreshToken?: string; expiresIn?: number; scope?: string; tokenType?: string }) => {
     const newConnections = {
       ...connections,
       [connectorId]: {
         connected: true,
         authType: "oauth",
-        oauthToken: "oauth_token_" + Date.now(),
+        hasToken: !!tokenData?.accessToken,
+        tokenType: tokenData?.tokenType || "Bearer",
+        scope: tokenData?.scope || "",
         connectedAt: new Date().toISOString(),
       },
     };
     saveConnections(newConnections);
     setOauthPending(null);
+    // Reload connections from server to sync with token storage
+    loadConnections();
   };
 
   // Handle API Key connection
@@ -255,6 +287,34 @@ export default function ToolsPage() {
     setConnectForm({ apiKey: "", connectionString: "" });
   };
 
+  // Handle test connection for API key tools
+  const handleTestConnection = async () => {
+    if (!connectDialog || !connectForm.apiKey.trim()) return;
+    setTesting(true);
+    setTestResult(null);
+
+    try {
+      const res = await fetch("/api/tools/test-connection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          connectorId: connectDialog.id,
+          apiKey: connectForm.apiKey.trim(),
+        }),
+      });
+
+      const data = await res.json();
+      setTestResult({
+        success: data.success === true,
+        message: data.message || (data.success ? "Connection successful!" : "Connection failed."),
+      });
+    } catch {
+      setTestResult({ success: false, message: "Failed to test connection. Check your network." });
+    } finally {
+      setTesting(false);
+    }
+  };
+
   // Handle no-auth connection
   const handleNoAuthConnect = async (connector: McpConnector) => {
     setConnecting(true);
@@ -281,6 +341,8 @@ export default function ToolsPage() {
 
   // Initiate connection based on auth type
   const initiateConnect = (connector: McpConnector) => {
+    setIsEditingConnection(false);
+    setTestResult(null);
     switch (connector.authType) {
       case "oauth":
         handleOAuthConnect(connector);
@@ -366,7 +428,7 @@ export default function ToolsPage() {
           <Input placeholder="Search tools..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
         </div>
         <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[180px]"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
           <SelectContent>
             {categories.map((cat) => (
               <SelectItem key={cat} value={cat}>{cat === "all" ? "All Categories" : cat}</SelectItem>
@@ -389,7 +451,7 @@ export default function ToolsPage() {
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     <div className={`rounded-lg p-2.5 ${CATEGORY_COLORS[connector.category] || CATEGORY_COLORS.Custom}`}>
-                      {ICON_MAP[connector.icon] || <Wrench className="h-5 w-5" />}
+                      <ConnectorIcon iconKey={connector.icon} />
                     </div>
                     <div>
                       <CardTitle className="text-sm">{connector.name}</CardTitle>
@@ -454,11 +516,10 @@ export default function ToolsPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => {
+                          setIsEditingConnection(true);
                           setConnectDialog(connector);
-                          setConnectForm({
-                            apiKey: conn.apiKey ? conn.apiKey.slice(0, 8) + "..." : "",
-                            connectionString: conn.connectionString ? conn.connectionString.slice(0, 20) + "..." : "",
-                          });
+                          setConnectForm({ apiKey: "", connectionString: "" });
+                          setTestResult(null);
                         }}
                       >
                         <Settings className="h-3.5 w-3.5" />
@@ -496,48 +557,103 @@ export default function ToolsPage() {
       )}
 
       {/* API Key / Connection String Dialog */}
-      <Dialog open={!!connectDialog} onOpenChange={(open) => { if (!open) { setConnectDialog(null); setConnectForm({ apiKey: "", connectionString: "" }); } }}>
+      <Dialog open={!!connectDialog} onOpenChange={(open) => { if (!open) { setConnectDialog(null); setConnectForm({ apiKey: "", connectionString: "" }); setTestResult(null); setIsEditingConnection(false); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              {connectDialog && ICON_MAP[connectDialog.icon]}
-              Connect {connectDialog?.name}
+              <div className={`rounded-md p-1.5 ${CATEGORY_COLORS[connectDialog?.category || "Custom"] || CATEGORY_COLORS.Custom}`}>
+                {connectDialog && <ConnectorIcon iconKey={connectDialog.icon} className="h-4 w-4" />}
+              </div>
+              {isEditingConnection ? `Update ${connectDialog?.name}` : `Connect ${connectDialog?.name}`}
             </DialogTitle>
             <DialogDescription>
-              {connectDialog?.authType === "api_key"
-                ? `Enter your API key to connect to ${connectDialog?.name}. Your key is stored securely.`
-                : `Enter the connection string for your ${connectDialog?.name} instance.`}
+              {isEditingConnection
+                ? `Update your credentials for ${connectDialog?.name}. Enter a new key to replace the existing one.`
+                : connectDialog?.authType === "api_key"
+                  ? `Enter your API key to connect to ${connectDialog?.name}. Your key is stored securely.`
+                  : `Enter the connection string for your ${connectDialog?.name} instance.`}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Show current connection status when editing */}
+            {isEditingConnection && connectDialog && connections[connectDialog.id]?.connected && (
+              <div className="flex items-center gap-2 rounded-md bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 px-3 py-2 text-xs text-green-700 dark:text-green-300">
+                <Check className="h-3.5 w-3.5 shrink-0" />
+                <span>
+                  Currently connected
+                  {connections[connectDialog.id]?.connectedAt && (
+                    <> since {new Date(connections[connectDialog.id].connectedAt!).toLocaleDateString()}</>
+                  )}
+                  {connections[connectDialog.id]?.apiKey && (
+                    <> — Key: {connections[connectDialog.id].apiKey!.slice(0, 8)}...{connections[connectDialog.id].apiKey!.slice(-4)}</>
+                  )}
+                </span>
+              </div>
+            )}
+
             {connectDialog?.authType === "api_key" && (
               <div className="space-y-2">
-                <Label>API Key</Label>
+                <Label>{isEditingConnection ? "New API Key" : "API Key"}</Label>
                 <div className="relative">
                   <Key className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     type="password"
-                    placeholder="Enter your API key..."
+                    placeholder={isEditingConnection ? "Enter new API key to replace..." : "Enter your API key..."}
                     className="pl-9 font-mono text-sm"
                     value={connectForm.apiKey}
                     onChange={(e) => setConnectForm((p) => ({ ...p, apiKey: e.target.value }))}
                   />
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  You can find your API key in the {connectDialog.name} dashboard settings.
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground flex-1">
+                    You can find your API key in the {connectDialog.name} dashboard settings.
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleTestConnection}
+                    disabled={testing || !connectForm.apiKey.trim()}
+                    className="shrink-0"
+                  >
+                    {testing ? (
+                      <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> Testing...</>
+                    ) : (
+                      <><Plug className="h-3.5 w-3.5 mr-1" /> Test</>
+                    )}
+                  </Button>
+                </div>
+                {testResult && (
+                  <div className={`flex items-start gap-2 rounded-md px-3 py-2 text-xs ${
+                    testResult.success
+                      ? "bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300"
+                      : "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300"
+                  }`}>
+                    {testResult.success ? (
+                      <Check className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    ) : (
+                      <Info className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    )}
+                    <span>{testResult.message}</span>
+                  </div>
+                )}
               </div>
             )}
 
             {connectDialog?.authType === "connection_string" && (
               <div className="space-y-2">
-                <Label>Connection String</Label>
+                <Label>{isEditingConnection ? "New Connection String" : "Connection String"}</Label>
                 <div className="relative">
                   <Link2 className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                   <Input
                     type="password"
-                    placeholder="postgresql://user:password@host:5432/dbname"
+                    placeholder={
+                      connectDialog.id === "mongodb"
+                        ? "mongodb+srv://user:password@cluster.mongodb.net/dbname"
+                        : connectDialog.id === "mysql"
+                        ? "mysql://user:password@host:3306/dbname"
+                        : "protocol://user:password@host:port/dbname"
+                    }
                     className="pl-9 font-mono text-sm"
                     value={connectForm.connectionString}
                     onChange={(e) => setConnectForm((p) => ({ ...p, connectionString: e.target.value }))}
@@ -557,7 +673,7 @@ export default function ToolsPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setConnectDialog(null); setConnectForm({ apiKey: "", connectionString: "" }); }}>
+            <Button variant="outline" onClick={() => { setConnectDialog(null); setConnectForm({ apiKey: "", connectionString: "" }); setIsEditingConnection(false); }}>
               Cancel
             </Button>
             <Button
@@ -573,9 +689,9 @@ export default function ToolsPage() {
               }
             >
               {connecting ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Connecting...</>
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> {isEditingConnection ? "Updating..." : "Connecting..."}</>
               ) : (
-                <><Plug className="h-4 w-4 mr-2" /> Connect</>
+                <><Plug className="h-4 w-4 mr-2" /> {isEditingConnection ? "Update" : "Connect"}</>
               )}
             </Button>
           </DialogFooter>

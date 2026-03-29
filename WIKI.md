@@ -11,20 +11,23 @@ A comprehensive guide to every feature, page, and operation available in Maestro
 3. [Agents](#3-agents)
    - [Creating an Agent](#31-creating-an-agent)
    - [Agent Detail Page](#32-agent-detail-page)
-   - [Playground](#33-playground)
+   - [Playground (per-agent)](#33-playground)
    - [Versions](#34-versions)
    - [Deployments](#35-deployments)
    - [Metrics](#36-metrics)
    - [Logs](#37-logs)
-4. [Memory](#4-memory)
-5. [Tools](#5-tools)
-6. [Skills](#6-skills)
-7. [Marketplace (Import/Export)](#7-marketplace-importexport)
-8. [Diagnostics](#8-diagnostics)
-9. [Settings](#9-settings)
-10. [API Reference](#10-api-reference)
-11. [Architecture](#11-architecture)
-12. [Data Models](#12-data-models)
+4. [Chat Playground](#4-chat-playground)
+5. [Memory](#5-memory)
+6. [Tools](#6-tools)
+7. [Skills](#7-skills)
+8. [Marketplace (Import/Export)](#8-marketplace-importexport)
+9. [Diagnostics](#9-diagnostics)
+10. [Settings](#10-settings)
+11. [CLI (Command-Line Interface)](#11-cli-command-line-interface)
+12. [API Reference](#12-api-reference)
+13. [Architecture](#13-architecture)
+14. [Data Models](#14-data-models)
+15. [Changelog](#15-changelog)
 
 ---
 
@@ -287,7 +290,60 @@ Structured logging system for monitoring agent behavior.
 
 ---
 
-## 4. Memory
+## 4. Chat Playground
+
+**Route:** `/playground`
+
+A dedicated, full-page chat interface for testing any agent with real tool execution, file attachments, and full conversation memory.
+
+### Layout
+
+- **Sidebar** — Agent selection dropdown, channel selector (Development / Staging / Production), session info, and New Chat button
+- **Chat Area** — Message thread with rich rendering, input bar at the bottom with file attachment support
+
+### Features
+
+| Feature | Description |
+|---------|-------------|
+| **Agent Selection** | Dropdown lists all agents in the system. Select one to start chatting. |
+| **Channel Selection** | Choose between Development, Staging, or Production environments. |
+| **Conversation Memory** | Full message history is sent with every request. The agent retains context across the entire session. |
+| **File Attachments** | Attach images, PDFs, Excel, TXT, and other files via drag-and-drop or the clip icon. Image previews are shown inline. |
+| **Rich Rendering** | Agent responses render markdown: code blocks with syntax labels, bold, italic, and inline code. |
+| **Streaming Responses** | Responses appear token-by-token via Server-Sent Events. |
+| **Tool Usage Indicators** | When the agent invokes tools, expandable cards show the tool name, input, output, and status (running/completed/error) with timing. |
+| **Skill Usage Indicators** | When the agent has active skills, amber badges display each skill name on assistant messages (e.g., "Documentation Writer"). |
+| **Copy Messages** | Hover over any message to reveal a copy button. |
+| **Token Tracking** | Output token count displayed per assistant message. |
+| **New Chat** | Clears conversation history and starts a fresh session. |
+
+### How Conversation Memory Works
+
+1. All prior user and assistant messages are collected from the current session
+2. They are sent as the `history` array in the API request body
+3. The backend prepends the full history to the Anthropic API `messages` array
+4. The agent sees the complete conversation context on every turn
+
+Memory is scoped per session — starting a "New Chat" resets it completely.
+
+### How Skill Indicators Work
+
+1. When a message is sent, the backend checks for enabled skills in the agent definition
+2. A `skills_active` SSE event is emitted at the start of the stream with the list of active skill names
+3. The frontend displays amber badges on the assistant message showing which skills are active
+4. Skills are injected into the system prompt, not called as tools — the badges indicate which specialized instructions are influencing the agent's behavior
+
+### How Tool Indicators Work
+
+1. When the agent decides to use a tool, a `tool_use_start` SSE event is emitted
+2. The frontend shows an expandable card with a spinning indicator and the tool name
+3. When the tool completes, a `tool_result` event updates the card with output and duration
+4. Cards can be expanded to inspect the full input JSON and output text
+5. On stream completion, any still-running tools are automatically marked as completed
+
+---
+
+## 5. Memory
 
 **Route:** `/memory`
 
@@ -337,31 +393,150 @@ The agent can then:
 
 ---
 
-## 5. Tools
+## 6. Tools
 
 **Route:** `/tools`
 
-Manage MCP (Model Context Protocol) server connections and tool configurations.
+Manage MCP (Model Context Protocol) server connections and tool configurations. The Tools page provides a unified interface for connecting 33 pre-built integrations across development, communication, productivity, data, and more.
 
-### Available Connectors
+### Available Connectors (33 total)
 
-| Connector | Auth Type | Capabilities |
-|-----------|-----------|-------------|
-| **GitHub** | OAuth | Repositories, issues, PRs, code search |
-| **Slack** | OAuth | Messages, channels, conversations |
-| **Filesystem** | None | Read, write, manage local files |
-| **PostgreSQL** | Connection String | Query, table management |
-| **Brave Search** | API Key | Web search for real-time information |
-| **Google Drive** | OAuth | File access and management |
-| **Memory** | None | Knowledge graph persistence |
-| **Puppeteer** | None | Browser automation, scraping, screenshots |
+#### Development
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **GitHub** | OAuth 2.0 | `search_repositories`, `get_file_contents`, `create_issue`, `list_pull_requests`, `create_pull_request`, `get_commit_history` | Access repositories, issues, PRs, and code search via GitHub's API |
+
+#### Communication
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **Slack** | OAuth 2.0 | `send_message`, `search_messages`, `list_channels`, `get_channel_history`, `add_reaction` | Send messages, search conversations, and manage channels |
+| **Outlook** | OAuth 2.0 | `send_email`, `read_inbox`, `search_emails`, `list_calendar_events`, `create_calendar_event`, `list_contacts` | Read/send emails, manage calendar, and access contacts via Microsoft Outlook |
+| **Gmail** | OAuth 2.0 | `send_email`, `read_inbox`, `search_emails`, `get_thread`, `create_label`, `modify_labels` | Read, send, and manage emails with full label and thread support |
+| **Discord** | API Key | `send_message`, `read_messages`, `list_channels`, `list_guild_members`, `create_channel`, `add_reaction` | Send messages, manage channels, and interact with Discord servers |
+| **Telegram** | API Key | `send_message`, `get_updates`, `send_photo`, `get_chat`, `set_webhook`, `edit_message` | Send/receive messages, manage groups, and handle media via Telegram Bot API |
+
+#### Productivity
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **Google Drive** | OAuth 2.0 | `search_files`, `read_file`, `list_files` | Access and manage files including docs, sheets, and slides |
+| **Google Calendar** | OAuth 2.0 | `list_events`, `create_event`, `update_event`, `delete_event`, `list_calendars`, `find_free_time` | Create, read, and manage events across Google Calendar accounts |
+| **OneDrive** | OAuth 2.0 | `list_files`, `upload_file`, `download_file`, `search_files`, `create_folder`, `share_file` | Access, upload, and manage files in Microsoft OneDrive |
+| **Notion** | OAuth 2.0 | `search_pages`, `read_page`, `create_page`, `update_page`, `query_database`, `create_database` | Read, create, and update pages, databases, and blocks in Notion |
+| **Airtable** | API Key | `list_records`, `create_record`, `update_record`, `delete_record`, `list_bases`, `list_tables` | Read, create, and update records in Airtable bases |
+
+#### CRM
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **HubSpot** | OAuth 2.0 | `list_contacts`, `create_contact`, `update_contact`, `list_deals`, `create_deal`, `search_crm` | Manage contacts, deals, companies, and pipelines |
+| **Salesforce** | OAuth 2.0 | `query_soql`, `create_record`, `update_record`, `delete_record`, `describe_object`, `search_sosl` | Query records, manage objects, and automate workflows |
+
+#### Data
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **PostgreSQL** | Connection String | `query`, `list_tables`, `describe_table`, `insert_row`, `update_rows` | Query and manage PostgreSQL databases |
+| **Supabase** | API Key | `query_table`, `insert_rows`, `update_rows`, `delete_rows`, `upload_file`, `invoke_function` | Query tables, manage storage, and invoke edge functions |
+| **MongoDB** | Connection String | `find_documents`, `insert_document`, `update_document`, `delete_document`, `aggregate`, `list_collections` | Query, insert, update, and aggregate documents |
+| **MySQL** | Connection String | `query`, `list_tables`, `describe_table`, `insert_row`, `update_rows`, `execute_sql` | Execute queries, manage tables, and perform operations |
+
+#### Design
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **Figma** | OAuth 2.0 | `get_file`, `get_components`, `get_styles`, `get_comments`, `export_nodes`, `list_projects` | Access design files, components, and styles from Figma |
+| **Canva** | OAuth 2.0 | `create_design`, `list_templates`, `export_design`, `upload_asset`, `list_folders`, `share_design` | Create designs, manage templates, and export assets |
+
+#### Finance
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **Stripe** | API Key | `list_customers`, `create_payment_intent`, `list_subscriptions`, `create_invoice`, `get_balance`, `list_charges` | Manage payments, customers, subscriptions, and invoices |
+| **PayPal** | OAuth 2.0 | `create_order`, `capture_payment`, `list_transactions`, `create_payout`, `get_balance`, `issue_refund` | Process payments, manage orders, and handle payouts |
+
+#### Project Management
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **Asana** | OAuth 2.0 | `list_tasks`, `create_task`, `update_task`, `list_projects`, `create_project`, `add_comment` | Manage projects, tasks, and teams |
+| **Jira** | OAuth 2.0 | `search_issues`, `create_issue`, `update_issue`, `add_comment`, `list_sprints`, `transition_issue` | Create/manage issues, search with JQL, track sprints |
+| **Confluence** | OAuth 2.0 | `search_content`, `get_page`, `create_page`, `update_page`, `list_spaces`, `get_page_children` | Read, create, and search pages and spaces |
+
+#### Search
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **Brave Search** | API Key | `brave_web_search`, `brave_local_search` | Web search for real-time information retrieval |
+| **Wikipedia** | None | `search_articles`, `get_article`, `get_summary`, `get_sections`, `get_links`, `get_categories` | Search and retrieve articles, summaries, and structured data |
+
+#### Automation
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **Puppeteer** | None | `navigate`, `screenshot`, `click`, `fill`, `evaluate` | Browser automation for web scraping and testing |
+| **Zapier** | API Key | `list_actions`, `execute_action`, `get_action_status`, `list_zaps`, `enable_zap`, `disable_zap` | Trigger Zaps, list actions, and manage automations |
+| **n8n** | API Key | `trigger_workflow`, `list_workflows`, `get_execution`, `list_executions`, `activate_workflow`, `deactivate_workflow` | Trigger workflows, manage executions in your n8n instance |
+
+#### Infrastructure
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **Cloudflare** | API Key | `list_zones`, `create_dns_record`, `list_workers`, `deploy_worker`, `kv_read`, `kv_write` | Manage DNS records, Workers, KV namespaces, and security settings |
+
+#### AI
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **Memory** | None | `create_entities`, `create_relations`, `search_nodes`, `read_graph`, `delete_entities` | Persistent knowledge graph memory for context across conversations |
+| **Context7** | None | `resolve_library_id`, `get_library_docs` | Retrieve up-to-date library documentation and code examples |
+
+#### System
+
+| Connector | Auth Type | Tools | Description |
+|-----------|-----------|-------|-------------|
+| **Filesystem** | None | `read_file`, `write_file`, `list_directory`, `create_directory`, `move_file`, `search_files` | Read, write, and manage local files with configurable access controls |
+
+### Authentication Types
+
+| Type | Flow | Connectors |
+|------|------|------------|
+| **OAuth 2.0** | Opens a branded authorization popup where the user reviews requested permissions and clicks Authorize. Connection is only saved on explicit approval. | GitHub, Slack, Outlook, OneDrive, Gmail, Google Calendar, Google Drive, Notion, HubSpot, Salesforce, Figma, Canva, PayPal, Asana, Jira, Confluence |
+| **API Key** | User enters an API key/token in a dialog and clicks Connect. | Brave Search, Discord, Telegram, Airtable, Supabase, Stripe, Zapier, Cloudflare, n8n |
+| **Connection String** | User enters a database connection string. | PostgreSQL, MongoDB, MySQL |
+| **None** | No credentials required — connects instantly. | Filesystem, Memory, Puppeteer, Wikipedia, Context7 |
+
+### OAuth Authorization Flow
+
+OAuth connectors use a real popup-based OAuth 2.0 authorization code flow:
+
+1. User clicks **Connect** on an OAuth connector
+2. A popup opens showing the `/tools/oauth` authorization page, branded with the provider's color scheme, icon, and name
+3. The page displays:
+   - **Redirect URI** — The callback URL to register in the provider's OAuth app settings (with copy button)
+   - **Client ID** field — Required to start the flow
+   - **Client Secret** field — Required for the token exchange step
+   - **Requested permissions** — Provider-specific scopes (e.g., "Read & send emails", "Manage calendar events")
+   - **Setup guide link** — Links to the provider's OAuth app documentation
+4. User enters their OAuth app credentials and clicks **Authorize**
+5. The browser redirects to the real provider authorization URL (e.g., `https://github.com/login/oauth/authorize`) with proper `client_id`, `redirect_uri`, `response_type=code`, `state`, and `scope` parameters
+6. After the user grants access at the provider, the callback (`/tools/oauth/callback`) receives the authorization code
+7. The callback extracts the connector ID from the `state` parameter and calls `/api/tools/oauth/token` to exchange the code for access/refresh tokens
+8. On success, the callback sends a `postMessage` with the token data to the parent window, which persists the connection
+9. On Deny: the popup sends a failure message and closes — no connection is saved
+10. If the user closes the popup without completing, the pending state is cleared
+
+Each provider has its own specific configuration (authorization URL, token URL, scopes, and provider-specific parameters like `access_type=offline` for Google or `audience=api.atlassian.com` for Atlassian).
+
+The connection is **only** marked as connected when the popup sends a `success: true` message with valid token data — closing the popup or denying access does not create a connection.
 
 ### Operations
 
-- **Connect** — Configure credentials for a connector
-- **Disconnect** — Remove credentials
-- **Test** — Verify the connection works
-- **Assign to Agent** — Link a connector to an agent
+- **Connect** — Configure credentials for a connector (OAuth popup, API key dialog, or instant for no-auth)
+- **Disconnect** — Remove credentials and revoke access
+- **Assign to Agent** — Link a connected tool to an agent from the agent's configuration page
 - **Custom Tools** — Create custom tool definitions with name, description, and JSON Schema input
 
 ### Built-in Executable Tools
@@ -382,7 +557,7 @@ These tools execute directly in the playground without needing an MCP server:
 
 ---
 
-## 6. Skills
+## 7. Skills
 
 **Route:** `/skills`
 
@@ -425,7 +600,7 @@ Your skill instructions here...
 
 ---
 
-## 7. Marketplace (Import/Export)
+## 8. Marketplace (Import/Export)
 
 **Route:** `/marketplace`
 
@@ -457,7 +632,7 @@ Share and reuse agents across projects.
 
 ---
 
-## 8. Diagnostics
+## 9. Diagnostics
 
 **Route:** `/diagnostics`
 
@@ -502,7 +677,7 @@ This is useful for verifying that filesystem operations, memory queries, and oth
 
 ---
 
-## 9. Settings
+## 10. Settings
 
 **Route:** `/settings`
 
@@ -524,7 +699,90 @@ Click "Test" after entering your API key to verify it works before saving.
 
 ---
 
-## 10. API Reference
+## 11. CLI (Command-Line Interface)
+
+The MaestroAgentica CLI provides a terminal-based interface for interacting with agents directly from the command line.
+
+### Installation & Launch
+
+```bash
+# Run directly from the project
+node cli/maestro.mjs
+
+# With options
+node cli/maestro.mjs --url http://localhost:3000 --env development
+```
+
+### Command-Line Flags
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--url <url>` | Base URL of the MaestroAgentica server | `http://localhost:3000` |
+| `--agent <name>` | Connect directly to a named agent (skip selection menu) | — |
+| `--env <env>` | Environment: `development`, `staging`, `production` | `development` |
+| `--key <key>` | API key for authentication | — |
+| `--help` | Show help and exit | — |
+
+### Interactive Commands
+
+Once connected, use these commands at any time by typing them in the chat:
+
+| Command | Description |
+|---------|-------------|
+| `/agents` | List all available agents |
+| `/select <name>` | Switch to a different agent (supports fuzzy matching) |
+| `/new` | Start a new conversation (clears history) |
+| `/history` | Show the current conversation history |
+| `/conversations` | Info about viewing past conversations |
+| `/load <id>` | Info about loading past conversations |
+| `/clear` | Clear the terminal display |
+| `/exit` | Exit the CLI |
+| `/help` | Show available commands |
+
+### Features
+
+- **Streaming Responses** — Agent responses are streamed token-by-token via SSE
+- **Tool Visualization** — Tool invocations are displayed inline with status indicators (`⚡ Using tool: <name> [done]` or `[error]`)
+- **Conversation Memory** — Full message history is passed on every turn, maintaining context throughout the session
+- **Multi-line Input** — End a line with `\` to continue on the next line
+- **Token Tracking** — Input/output token counts are shown after each response
+- **Config Persistence** — Connection settings (`--url`, `--key`, `--env`) are saved to `~/.maestro/config.json` for reuse
+- **Agent Fuzzy Matching** — Both `/select` and `--agent` support partial name matching
+
+### Example Session
+
+```
+  ╔══════════════════════════════════════╗
+  ║       MaestroAgentica CLI v0.1       ║
+  ╚══════════════════════════════════════╝
+
+  Server: http://localhost:3000
+  Environment: development
+
+Available Agents:
+──────────────────────────────────────────────────
+  ► 1. CodeAssistant (a3f2b1c8...) [active]
+       A helpful coding assistant with filesystem tools
+
+Select an agent (number or name): 1
+Connected to CodeAssistant
+
+You (CodeAssistant): List the files in the current directory
+
+CodeAssistant:
+  ⚡ Using tool: list_directory [done]
+
+Here are the files in the agent sandbox:
+- README.md
+- src/
+- package.json
+
+  [245 input / 38 output tokens]
+```
+
+---
+
+## 12. API Reference
 
 ### Agent Endpoints
 
@@ -624,7 +882,7 @@ POST   /api/diagnostics                # Execute a tool (body: { toolName, input
 
 ---
 
-## 11. Architecture
+## 13. Architecture
 
 ### Request Flow
 
@@ -677,7 +935,7 @@ SQLite with Prisma ORM. All relations cascade on delete.
 
 ---
 
-## 12. Data Models
+## 14. Data Models
 
 ### Agent
 
@@ -747,3 +1005,27 @@ SQLite with Prisma ORM. All relations cascade on delete.
 | success | boolean | Whether execution succeeded |
 | modelUsed | string | Model ID used |
 | numTurns | int | Number of tool-use turns |
+
+---
+
+## 15. Changelog
+
+### v0.2.0 — Chat Playground & Bug Fixes
+
+#### New Features
+
+- **Dedicated Chat Playground** (`/playground`) — Full-page chat interface with agent selection, channel picker, file attachments, and streaming responses
+- **Skill Usage Indicators** — Amber badges on assistant messages showing which skills are active during the conversation (e.g., "Documentation Writer", "Code Review")
+- **Tool Usage Indicators** — Expandable cards showing tool name, input, output, status, and execution duration during agent conversations
+- **Conversation Memory** — Full message history is passed with every request, maintaining context across the entire chat session
+
+#### Bug Fixes
+
+- **Agent Chat Memory** — Fixed conversation history not being passed to the agent on subsequent messages. Prior messages are now correctly sent as the `history` array on every turn.
+- **Filesystem Tools Hanging** — Fixed tool execution never completing when `maxTurns` was set to 1. The minimum is now enforced at 2 turns when tools are available (one for tool invocation, one for processing results). Also fixed tools with empty input not being captured due to a falsy-check on the input JSON string.
+- **Tool Spinner Never Stopping** — Added safety net that marks any remaining "running" tool calls as "completed" when the stream ends, ensuring spinners always resolve.
+- **OAuth Hydration Errors** — Fixed `window.location.origin` being computed during server render, causing Next.js hydration mismatch errors on all OAuth tool pages. The redirect URI is now set via `useEffect` on the client only.
+- **No Agents in Playground** — Fixed the agent dropdown showing no agents. The `/api/agents` endpoint returns an array directly, but the playground expected `data.agents`. Now handles both formats.
+- **CLI Shows No Agents** — Fixed the CLI `fetchAgents()` expecting `data.agents` from the API response, but the API returns a plain array. Now handles both formats.
+- **Tool Indicators Missing for Non-Filesystem Tools** — External/MCP connector tools (Wikipedia, GitHub, Slack, etc.) were not registered with Claude because `getToolDefinitionsForIds` only mapped `filesystem` and `memory`. Added a full connector tool catalog with definitions for all 33 connectors so the agent can discover and invoke any attached tool.
+- **Stop Button Not Working** — The stop button in Chat Playground had no click handler. Now uses `AbortController` to abort the SSE stream, finalize the accumulated content, and resolve any running tool spinners.

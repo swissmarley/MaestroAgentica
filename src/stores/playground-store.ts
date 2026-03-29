@@ -55,10 +55,18 @@ export const usePlaygroundStore = create<PlaygroundStore>((set, get) => ({
     }));
 
     try {
+      // Build conversation history from prior messages (excluding the just-added ones)
+      const priorMessages = get().messages.filter(
+        (m) => m.id !== userMessage.id && m.id !== assistantMessageId && !m.isStreaming
+      );
+      const history = priorMessages
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .map((m) => ({ role: m.role, content: m.content }));
+
       const res = await fetch(`/api/agents/${agentId}/test`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, versionId }),
+        body: JSON.stringify({ prompt, versionId, history }),
       });
 
       if (!res.ok) {

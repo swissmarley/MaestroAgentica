@@ -96,3 +96,11 @@
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--muted-foreground) / 0.5);
 }
+
+/* OAuth popup: hide sidebar and make content full-width */
+body.oauth-popup aside[class] {
+  display: none !important;
+}
+body.oauth-popup main {
+  width: 100vw !important;
+}
