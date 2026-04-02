@@ -3,11 +3,12 @@ import { db } from "@/lib/db";
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const deployments = await db.deployment.findMany({
-      where: { agentId: params.id },
+      where: { agentId: id },
       include: {
         version: { select: { version: true } },
       },
@@ -37,9 +38,10 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const body = await request.json();
     const { environment, versionId, config } = body as {
       environment?: string;
@@ -55,7 +57,7 @@ export async function POST(
     }
 
     const agent = await db.agent.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         versions: versionId
           ? { where: { id: versionId } }
@@ -76,12 +78,12 @@ export async function POST(
     const deployment = await db.deployment.upsert({
       where: {
         agentId_environment: {
-          agentId: params.id,
+          agentId: id,
           environment,
         },
       },
       create: {
-        agentId: params.id,
+        agentId: id,
         versionId: version.id,
         environment,
         status: "running",
@@ -102,14 +104,14 @@ export async function POST(
 
     // Set agent status to active when deployed
     await db.agent.update({
-      where: { id: params.id },
+      where: { id },
       data: { status: "active" },
     });
 
     // Log the deployment
     await db.logEntry.create({
       data: {
-        agentId: params.id,
+        agentId: id,
         deploymentId: deployment.id,
         level: "info",
         message: `Deployed ${deployment.version.version} to ${environment}`,
@@ -131,9 +133,10 @@ export async function POST(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const { searchParams } = new URL(request.url);
     const environment = searchParams.get("environment");
 
@@ -144,7 +147,7 @@ export async function DELETE(
     const deployment = await db.deployment.findUnique({
       where: {
         agentId_environment: {
-          agentId: params.id,
+          agentId: id,
           environment,
         },
       },
@@ -165,7 +168,7 @@ export async function DELETE(
     // Check if any deployments are still running
     const runningCount = await db.deployment.count({
       where: {
-        agentId: params.id,
+        agentId: id,
         status: "running",
         id: { not: deployment.id },
       },
@@ -174,14 +177,14 @@ export async function DELETE(
     // If no deployments running, set agent back to draft
     if (runningCount === 0) {
       await db.agent.update({
-        where: { id: params.id },
+        where: { id },
         data: { status: "draft" },
       });
     }
 
     await db.logEntry.create({
       data: {
-        agentId: params.id,
+        agentId: id,
         deploymentId: deployment.id,
         level: "info",
         message: `Stopped deployment in ${environment}`,

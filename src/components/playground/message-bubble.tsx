@@ -22,8 +22,8 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
   if (message.role === "system") {
     return (
-      <div className="flex justify-center">
-        <div className="text-xs text-muted-foreground bg-muted/50 rounded-full px-3 py-1">
+      <div className="flex justify-center animate-fade-in">
+        <div className="text-xs text-muted-foreground bg-muted/30 rounded-full px-4 py-1.5 border border-border/30">
           {message.content}
         </div>
       </div>
@@ -33,13 +33,13 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === "user";
 
   return (
-    <div className={cn("flex gap-3 group", isUser ? "flex-row-reverse" : "")}>
+    <div className={cn("flex gap-3 group animate-fade-in-up", isUser ? "flex-row-reverse" : "")}>
       <div
         className={cn(
-          "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
+          "w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-200 ease-out group-hover:scale-105",
           isUser
-            ? "bg-primary text-primary-foreground"
-            : "bg-muted text-muted-foreground"
+            ? "gradient-primary text-white shadow-glow"
+            : "bg-muted/50 text-muted-foreground border border-border/30"
         )}
       >
         {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
@@ -48,14 +48,14 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       <div className={cn("flex flex-col gap-1 max-w-[80%]", isUser ? "items-end" : "")}>
         <div
           className={cn(
-            "rounded-lg px-4 py-2.5 text-sm",
+            "rounded-2xl px-4 py-3 text-sm",
             isUser
-              ? "bg-primary text-primary-foreground"
-              : "bg-muted",
+              ? "gradient-primary text-white shadow-glow"
+              : "bg-card border border-border/30 shadow-premium",
             message.isStreaming && "animate-pulse"
           )}
         >
-          <div className="whitespace-pre-wrap break-words">
+          <div className="whitespace-pre-wrap break-words leading-relaxed">
             {message.content || (message.isStreaming ? "..." : "")}
           </div>
         </div>
@@ -72,24 +72,24 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         {/* Actions */}
         <div
           className={cn(
-            "flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity",
+            "flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200",
             isUser ? "flex-row-reverse" : ""
           )}
         >
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6"
+            className="h-6 w-6 rounded-lg"
             onClick={handleCopy}
           >
             {copied ? (
-              <Check className="h-3 w-3" />
+              <Check className="h-3 w-3 text-emerald-500" />
             ) : (
               <Copy className="h-3 w-3" />
             )}
           </Button>
           {message.tokenCount && (
-            <span className="text-[10px] text-muted-foreground">
+            <span className="text-[10px] text-muted-foreground/60">
               {message.tokenCount} tokens
             </span>
           )}

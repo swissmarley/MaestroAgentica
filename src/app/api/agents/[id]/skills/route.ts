@@ -4,9 +4,10 @@ import { db } from "@/lib/db";
 // POST /api/agents/[id]/skills - Attach a skill to this agent
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const body = await request.json();
     const { skillId } = body as { skillId?: string };
 
@@ -14,14 +15,14 @@ export async function POST(
       return NextResponse.json({ error: "skillId is required" }, { status: 400 });
     }
 
-    const agent = await db.agent.findUnique({ where: { id: params.id } });
+    const agent = await db.agent.findUnique({ where: { id } });
     if (!agent) {
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
     }
 
     const agentSkill = await db.agentSkill.upsert({
-      where: { agentId_skillId: { agentId: params.id, skillId } },
-      create: { agentId: params.id, skillId },
+      where: { agentId_skillId: { agentId: id, skillId } },
+      create: { agentId: id, skillId },
       update: {},
     });
 
@@ -35,9 +36,10 @@ export async function POST(
 // DELETE /api/agents/[id]/skills - Detach a skill from this agent
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const { searchParams } = new URL(request.url);
     const skillId = searchParams.get("skillId");
 
@@ -46,7 +48,7 @@ export async function DELETE(
     }
 
     await db.agentSkill.deleteMany({
-      where: { agentId: params.id, skillId },
+      where: { agentId: id, skillId },
     });
 
     return NextResponse.json({ success: true });

@@ -4,9 +4,10 @@ import { db } from "@/lib/db";
 // POST /api/agents/[id]/tools - Attach a tool to this agent
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const body = await request.json();
     const { toolId, config } = body as { toolId?: string; config?: string };
 
@@ -14,14 +15,14 @@ export async function POST(
       return NextResponse.json({ error: "toolId is required" }, { status: 400 });
     }
 
-    const agent = await db.agent.findUnique({ where: { id: params.id } });
+    const agent = await db.agent.findUnique({ where: { id } });
     if (!agent) {
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
     }
 
     const agentTool = await db.agentTool.upsert({
-      where: { agentId_toolId: { agentId: params.id, toolId } },
-      create: { agentId: params.id, toolId, config: config || "{}" },
+      where: { agentId_toolId: { agentId: id, toolId } },
+      create: { agentId: id, toolId, config: config || "{}" },
       update: { config: config || "{}" },
     });
 
@@ -35,9 +36,10 @@ export async function POST(
 // DELETE /api/agents/[id]/tools - Detach a tool from this agent
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const { searchParams } = new URL(request.url);
     const toolId = searchParams.get("toolId");
 
@@ -46,7 +48,7 @@ export async function DELETE(
     }
 
     await db.agentTool.deleteMany({
-      where: { agentId: params.id, toolId },
+      where: { agentId: id, toolId },
     });
 
     return NextResponse.json({ success: true });

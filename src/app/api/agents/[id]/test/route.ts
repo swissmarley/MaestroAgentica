@@ -33,8 +33,9 @@ const COST_PER_M_OUTPUT: Record<string, number> = {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const body = await request.json();
     const { prompt, versionId, history } = body as {
@@ -60,7 +61,7 @@ export async function POST(
 
     // Fetch agent with versions, tools, skills, and memory
     const agent = await db.agent.findUnique({
-      where: { id: params.id },
+      where: { id: id },
       include: {
         versions: versionId
           ? { where: { id: versionId } }
@@ -438,7 +439,7 @@ export async function POST(
 
         db.performanceMetric.create({
           data: {
-            agentId: params.id,
+            agentId: id,
             responseTime,
             inputTokens: totalInputTokens,
             outputTokens: totalOutputTokens,
@@ -463,7 +464,7 @@ export async function POST(
       },
     });
   } catch (err) {
-    console.error(`POST /api/agents/${params.id}/test error:`, err);
+    console.error(`POST /api/agents/${id}/test error:`, err);
     return NextResponse.json(
       { error: "Failed to start test" },
       { status: 500 }

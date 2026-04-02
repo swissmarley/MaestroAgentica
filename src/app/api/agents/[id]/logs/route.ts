@@ -24,11 +24,12 @@ function parseLogEntry(raw: {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const agent = await db.agent.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!agent) {
@@ -47,7 +48,7 @@ export async function GET(
       0
     );
 
-    const where: Record<string, unknown> = { agentId: params.id };
+    const where: Record<string, unknown> = { agentId: id };
 
     if (level) {
       const validLevels = ["debug", "info", "warn", "error"];
@@ -78,7 +79,7 @@ export async function GET(
       hasMore: offset + limit < total,
     });
   } catch (err) {
-    console.error(`GET /api/agents/${params.id}/logs error:`, err);
+    console.error(`GET /api/agents/${id}/logs error:`, err);
     return NextResponse.json(
       { error: "Failed to fetch logs" },
       { status: 500 }

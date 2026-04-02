@@ -110,18 +110,23 @@ export async function parseBinaryFile(buffer: Buffer, fileName: string): Promise
     case "xlsx":
     case "xls": {
       try {
-        const XLSX = await import("xlsx");
-        const workbook = XLSX.read(buffer, { type: "buffer" });
+        const ExcelJS = await import("exceljs");
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(buffer as unknown as ArrayBuffer);
         const texts: string[] = [];
-        for (const sheetName of workbook.SheetNames) {
-          const sheet = workbook.Sheets[sheetName];
-          const csv = XLSX.utils.sheet_to_csv(sheet);
-          texts.push(`Sheet: ${sheetName}\n${csv}`);
-        }
+        workbook.eachSheet((sheet) => {
+          const rows: string[] = [];
+          sheet.eachRow((row) => {
+            const values = (Array.isArray(row.values) ? row.values.slice(1) : [])
+              .map((v) => (v != null ? String(v) : ""));
+            rows.push(values.join(","));
+          });
+          texts.push(`Sheet: ${sheet.name}\n${rows.join("\n")}`);
+        });
         return texts.join("\n\n");
       } catch (err) {
         console.error("XLSX parse error:", err);
-        throw new Error("Failed to parse XLSX file. Ensure xlsx is installed.");
+        throw new Error("Failed to parse XLSX file. Ensure exceljs is installed.");
       }
     }
     default:

@@ -62,6 +62,34 @@ const config: Config = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        xl: "calc(var(--radius) + 4px)",
+        "2xl": "calc(var(--radius) + 8px)",
+      },
+      boxShadow: {
+        glow: "0 0 20px hsl(var(--glow-primary))",
+        "glow-lg": "0 0 40px hsl(var(--glow-primary)), 0 0 80px hsl(var(--glow-primary))",
+        "glow-accent": "0 0 20px hsl(var(--glow-accent))",
+        premium: "0 1px 2px hsl(var(--foreground) / 0.04), 0 4px 12px hsl(var(--foreground) / 0.06)",
+        "premium-lg": "0 2px 4px hsl(var(--foreground) / 0.04), 0 8px 24px hsl(var(--foreground) / 0.08)",
+        "premium-xl": "0 4px 8px hsl(var(--foreground) / 0.04), 0 16px 48px hsl(var(--foreground) / 0.1)",
+      },
+      keyframes: {
+        "accordion-down": {
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
+        },
+        "accordion-up": {
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+      },
+      animation: {
+        "accordion-down": "accordion-down 0.2s ease-out",
+        "accordion-up": "accordion-up 0.2s ease-out",
+      },
+      transitionTimingFunction: {
+        "out-expo": "cubic-bezier(0.16, 1, 0.3, 1)",
+        spring: "cubic-bezier(0.34, 1.56, 0.64, 1)",
       },
     },
   },

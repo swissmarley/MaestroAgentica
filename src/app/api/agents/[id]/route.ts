@@ -58,11 +58,12 @@ function parseAgentWithVersions(raw: {
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const agent = await db.agent.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         versions: {
           orderBy: { createdAt: "desc" },
@@ -96,7 +97,7 @@ export async function GET(
       skills: agentAny.skills || [],
     });
   } catch (err) {
-    console.error(`GET /api/agents/${params.id} error:`, err);
+    console.error(`GET /api/agents/${id} error:`, err);
     return NextResponse.json(
       { error: "Failed to fetch agent" },
       { status: 500 }
@@ -106,8 +107,9 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const body = await request.json();
     const { name, description, status, tags } = body as {
@@ -118,7 +120,7 @@ export async function PUT(
     };
 
     const existing = await db.agent.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existing) {
@@ -149,7 +151,7 @@ export async function PUT(
     }
 
     const agent = await db.agent.update({
-      where: { id: params.id },
+      where: { id },
       data,
       include: {
         versions: {
@@ -160,7 +162,7 @@ export async function PUT(
 
     return NextResponse.json(parseAgentWithVersions(agent));
   } catch (err) {
-    console.error(`PUT /api/agents/${params.id} error:`, err);
+    console.error(`PUT /api/agents/${id} error:`, err);
     return NextResponse.json(
       { error: "Failed to update agent" },
       { status: 500 }
@@ -170,11 +172,12 @@ export async function PUT(
 
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const existing = await db.agent.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existing) {
@@ -182,12 +185,12 @@ export async function DELETE(
     }
 
     await db.agent.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error(`DELETE /api/agents/${params.id} error:`, err);
+    console.error(`DELETE /api/agents/${id} error:`, err);
     return NextResponse.json(
       { error: "Failed to delete agent" },
       { status: 500 }
