@@ -17,7 +17,7 @@ Maestro Agentica is a local-first platform for creating and managing AI agents. 
 - **Playground** — Chat with your agents in real time with streaming responses and live tool execution (filesystem, memory, web search)
 - **Tools** — Connect MCP servers (GitHub, Slack, PostgreSQL, Brave Search, etc.) or use built-in filesystem and memory tools
 - **Skills** — Pre-built skill templates (Code Review, Security Auditor, SQL Expert, etc.) injected into agent system prompts
-- **Memory** — ChromaDB-backed vector memory collections; upload documents (PDF, DOCX, XLSX), and agents can query them semantically
+- **Memory** — File-based vector memory collections; upload documents (PDF, DOCX, XLSX), and agents can search them with term-overlap scoring
 - **Versioning** — Semantic versioning for every agent configuration change
 - **Deployments** — Deploy agents to dev, staging, and production environments
 - **Metrics & Logs** — Track response times, token usage, costs, success rates, and structured logs per agent
@@ -32,7 +32,7 @@ Maestro Agentica is a local-first platform for creating and managing AI agents. 
 | Language | TypeScript 5.4 |
 | AI | Anthropic Claude API (`@anthropic-ai/sdk`) |
 | Database | SQLite via Prisma ORM |
-| Vector Store | ChromaDB |
+| Vector Store | File-based local storage (JSON) |
 | UI | React 18, Tailwind CSS, Radix UI (shadcn/ui) |
 | Charts | Recharts |
 | State | Zustand |
@@ -43,7 +43,6 @@ Maestro Agentica is a local-first platform for creating and managing AI agents. 
 - **Node.js** 18.17 or later
 - **npm** or **yarn** or **pnpm**
 - **Anthropic API key** — get one at [console.anthropic.com](https://console.anthropic.com)
-- **ChromaDB** (optional) — only needed if you want to use the Memory feature
 
 ## Getting Started
 
@@ -75,8 +74,8 @@ DATABASE_URL="file:./dev.db"
 # Optional — can also be set in the Settings page
 ANTHROPIC_API_KEY="sk-ant-..."
 
-# Optional — only for Memory feature
-CHROMA_URL="http://localhost:8000"
+# Optional — directory for file-based memory storage (defaults to ./vectordb)
+VECTOR_DB_PATH="./vectordb"
 ```
 
 ### 4. Initialize the database
@@ -97,17 +96,6 @@ Open [http://localhost:3000](http://localhost:3000).
 ### 6. Configure your API key
 
 If you didn't set `ANTHROPIC_API_KEY` in `.env.local`, navigate to **Settings** in the sidebar and enter your key there.
-
-### 7. (Optional) Start ChromaDB for Memory
-
-```bash
-# Using Docker
-docker run -p 8000:8000 chromadb/chroma
-
-# Or install locally
-pip install chromadb
-chroma run --host localhost --port 8000
-```
 
 ## Project Structure
 
@@ -134,6 +122,26 @@ MaestroAgentica/
 ├── agent-sandbox/             # Sandboxed filesystem for agent tool execution
 ├── package.json
 └── tailwind.config.js
+```
+
+## Vector Storage (Memory)
+
+The **Memory** feature uses a lightweight, file-based vector store — no external database or server required.
+
+- **Storage:** Collections are stored as JSON files under `./vectordb/` (or your configured `VECTOR_DB_PATH`)
+- **Search:** Queries use term-overlap scoring — documents are scored based on how many query terms they contain
+- **Persistence:** All data persists across restarts automatically
+- **Supported formats:** PDF, DOCX, XLSX, XLS, TXT, MD, JSON, CSV, HTML, and more
+
+Each collection is a self-contained JSON file with the structure:
+```json
+{
+  "name": "my-collection",
+  "metadata": { "description": "..." },
+  "documents": [
+    { "id": "...", "text": "...", "metadata": { "fileName": "..." } }
+  ]
+}
 ```
 
 ## Available Scripts
