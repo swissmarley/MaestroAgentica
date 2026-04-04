@@ -45,3 +45,6 @@ prisma/dev.db-journal
 
 # claude code
 .claude/
+
+# file-based vector store
+/vectordb/
