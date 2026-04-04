@@ -27,11 +27,12 @@ function parseVersion(raw: {
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const agent = await db.agent.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!agent) {
@@ -39,13 +40,13 @@ export async function GET(
     }
 
     const versions = await db.agentVersion.findMany({
-      where: { agentId: params.id },
+      where: { agentId: id },
       orderBy: { createdAt: "desc" },
     });
 
     return NextResponse.json(versions.map(parseVersion));
   } catch (err) {
-    console.error(`GET /api/agents/${params.id}/versions error:`, err);
+    console.error(`GET /api/agents/${id}/versions error:`, err);
     return NextResponse.json(
       { error: "Failed to fetch versions" },
       { status: 500 }
@@ -55,8 +56,9 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const body = await request.json();
     const { changelog } = body as { changelog?: string };
@@ -82,7 +84,7 @@ export async function POST(
     }
 
     const agent = await db.agent.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!agent) {
@@ -91,7 +93,7 @@ export async function POST(
 
     // Get the latest version to determine the next version number
     const latestVersion = await db.agentVersion.findFirst({
-      where: { agentId: params.id },
+      where: { agentId: id },
       orderBy: { createdAt: "desc" },
     });
 
@@ -104,7 +106,7 @@ export async function POST(
 
     const version = await db.agentVersion.create({
       data: {
-        agentId: params.id,
+        agentId: id,
         version: nextVersion,
         definition: JSON.stringify(definition),
         changelog: (changelog ?? "").trim(),
@@ -114,13 +116,13 @@ export async function POST(
 
     // Touch the agent's updatedAt
     await db.agent.update({
-      where: { id: params.id },
+      where: { id: id },
       data: { updatedAt: new Date() },
     });
 
     return NextResponse.json(parseVersion(version), { status: 201 });
   } catch (err) {
-    console.error(`POST /api/agents/${params.id}/versions error:`, err);
+    console.error(`POST /api/agents/${id}/versions error:`, err);
     return NextResponse.json(
       { error: "Failed to create version" },
       { status: 500 }

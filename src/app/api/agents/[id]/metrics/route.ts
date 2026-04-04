@@ -19,11 +19,12 @@ function getPeriodStart(period: string): Date {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   try {
     const agent = await db.agent.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!agent) {
@@ -36,7 +37,7 @@ export async function GET(
 
     const metrics = await db.performanceMetric.findMany({
       where: {
-        agentId: params.id,
+        agentId: id,
         timestamp: { gte: periodStart },
       },
       orderBy: { timestamp: "asc" },
@@ -99,7 +100,7 @@ export async function GET(
       timeline,
     });
   } catch (err) {
-    console.error(`GET /api/agents/${params.id}/metrics error:`, err);
+    console.error(`GET /api/agents/${id}/metrics error:`, err);
     return NextResponse.json(
       { error: "Failed to fetch metrics" },
       { status: 500 }

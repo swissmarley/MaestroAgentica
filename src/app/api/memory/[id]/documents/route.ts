@@ -7,11 +7,12 @@ export const runtime = "nodejs";
 // POST /api/memory/[id]/documents - Upload a document to a collection
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const collection = await db.memoryCollection.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!collection) {
@@ -64,7 +65,7 @@ export async function POST(
     // Create document record
     const doc = await db.memoryDocument.create({
       data: {
-        collectionId: params.id,
+        collectionId: id,
         fileName,
         fileSize,
         chunkCount: chunks.length,
@@ -107,7 +108,7 @@ export async function POST(
 
     // Update total size
     await db.memoryCollection.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         totalSize: {
           increment: fileSize,

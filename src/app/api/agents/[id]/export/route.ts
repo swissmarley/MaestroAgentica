@@ -4,11 +4,12 @@ import JSZip from "jszip";
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const agent = await db.agent.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         versions: { orderBy: { createdAt: "desc" }, take: 1 },
         memories: {

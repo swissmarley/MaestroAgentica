@@ -170,7 +170,7 @@ An interactive chat interface for testing your agent with real tool execution.
 - **Streaming responses** — See the agent's response token by token via Server-Sent Events
 - **Real tool execution** — Tools are actually executed, not simulated:
   - **Filesystem tools** — `read_file`, `write_file`, `list_directory`, `create_directory`, `move_file`, `search_files` (sandboxed to `agent-sandbox/` directory)
-  - **Memory tools** — `memory_query` (semantic search in ChromaDB), `memory_store` (add to collections), `memory_list_collections`
+  - **Memory tools** — `memory_query` (term-overlap search in collections), `memory_store` (add to collections), `memory_list_collections`
   - **Web search** — Claude's built-in web search (server-managed)
 - **Tool call visualization** — See each tool invocation with its input parameters and output
 - **Multi-turn conversations** — The agent can use tools, get results, and continue reasoning up to `maxTurns`
@@ -347,12 +347,12 @@ Memory is scoped per session — starting a "New Chat" resets it completely.
 
 **Route:** `/memory`
 
-ChromaDB-powered vector memory system that gives agents access to custom knowledge bases.
+File-based vector memory system that gives agents access to custom knowledge bases. Collections are stored as JSON files with term-overlap search (no external server required).
 
 ### Concepts
 
-- **Collection** — A named container for documents in ChromaDB. Each collection has a unique `chromaId` used for vector operations.
-- **Document** — A file uploaded into a collection. Automatically chunked and embedded for semantic search.
+- **Collection** — A named container for documents stored in a local JSON file (`./vectordb/<collectionId>.json`).
+- **Document** — A file uploaded into a collection. Automatically chunked and indexed for keyword search.
 - **Agent-Memory Link** — A many-to-many relationship connecting agents to collections they can query.
 
 ### Operations
@@ -360,7 +360,7 @@ ChromaDB-powered vector memory system that gives agents access to custom knowled
 #### Create a Collection
 1. Click "New Collection"
 2. Enter a name and description
-3. The system creates a matching ChromaDB collection
+3. The system creates a local JSON file under `./vectordb/` to store the collection
 
 #### Upload Documents
 1. Open a collection
@@ -372,7 +372,7 @@ ChromaDB-powered vector memory system that gives agents access to custom knowled
 4. The system automatically:
    - Parses the file content (using pdf-parse, mammoth, or xlsx libraries)
    - Splits text into chunks (sentence-aware, ~1000 chars with 200 char overlap)
-   - Embeds chunks into ChromaDB
+   - Stores chunks with their metadata in the collection's JSON file
 
 #### Link to Agent
 1. Open a collection

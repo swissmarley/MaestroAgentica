@@ -130,7 +130,7 @@ export default function AgentsPage() {
   return (
     <div className="flex flex-col gap-6 p-6 lg:p-8">
       <Header title="Agents" description="Manage your AI agents">
-        <Button asChild>
+        <Button asChild variant="gradient">
           <Link href="/agents/new">
             <Plus className="mr-2 h-4 w-4" />
             Create Agent
@@ -138,14 +138,14 @@ export default function AgentsPage() {
         </Button>
       </Header>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center animate-fade-in" style={{ animationDelay: "100ms" }}>
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/60" />
           <Input
             placeholder="Search agents..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            className="pl-10"
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -162,65 +162,71 @@ export default function AgentsPage() {
       </div>
 
       {loading ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 stagger-children">
           {[1, 2, 3].map((i) => (
-            <Card key={i}>
-              <CardContent className="p-5">
-                <div className="animate-pulse space-y-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="h-9 w-9 rounded-lg bg-muted" />
-                    <div className="space-y-1.5 flex-1">
-                      <div className="h-4 w-32 rounded bg-muted" />
-                      <div className="h-3 w-16 rounded bg-muted" />
-                    </div>
+            <div key={i} className="rounded-2xl border border-border/50 bg-card p-5 animate-pulse">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-muted/50" />
+                  <div className="space-y-1.5 flex-1">
+                    <div className="h-4 w-32 rounded-lg bg-muted/50" />
+                    <div className="h-3 w-16 rounded-lg bg-muted/50" />
                   </div>
-                  <div className="h-8 rounded bg-muted" />
                 </div>
-              </CardContent>
-            </Card>
+                <div className="h-8 rounded-lg bg-muted/50" />
+              </div>
+            </div>
           ))}
         </div>
       ) : filteredAgents.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted mb-4">
-              <Bot className="h-7 w-7 text-muted-foreground" />
+        <div className="rounded-2xl border border-dashed border-border/50 bg-card animate-fade-in-up">
+          <div className="flex flex-col items-center justify-center py-16">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[hsl(var(--gradient-start)/0.1)] to-[hsl(var(--gradient-end)/0.1)] mb-4">
+              <Bot className="h-7 w-7 text-primary" />
             </div>
             <h3 className="text-lg font-semibold">
               {agents.length === 0 ? "No agents yet" : "No agents found"}
             </h3>
-            <p className="mt-1 text-sm text-muted-foreground text-center max-w-sm">
+            <p className="mt-1.5 text-sm text-muted-foreground text-center max-w-sm">
               {agents.length === 0
                 ? "Get started by creating your first AI agent."
                 : "Try adjusting your search or filter criteria."}
             </p>
             {agents.length === 0 && (
-              <Button asChild className="mt-4">
+              <Button asChild variant="gradient" className="mt-5">
                 <Link href="/agents/new">
                   <Plus className="mr-2 h-4 w-4" />
                   Create Agent
                 </Link>
               </Button>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 stagger-children">
           {filteredAgents.map((agent) => (
-            <Card
+            <div
               key={agent.id}
-              className="group transition-all hover:shadow-md hover:border-primary/20 cursor-pointer"
+              className={cn(
+                "group relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5 cursor-pointer",
+                "transition-all duration-300 ease-out",
+                "hover:-translate-y-1 hover:shadow-premium-lg hover:border-[hsl(var(--primary)/0.2)]",
+                "animate-fade-in-up"
+              )}
               onClick={() => router.push(`/agents/${agent.id}`)}
             >
-              <CardContent className="p-5">
+              {/* Gradient hover overlay */}
+              <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--gradient-start)/0.03)] to-[hsl(var(--gradient-end)/0.03)] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+
+              <div className="relative">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                      <Bot className="h-4.5 w-4.5" />
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl gradient-primary text-white transition-transform duration-300 ease-out group-hover:scale-105">
+                      <Bot className="h-[18px] w-[18px]" />
                     </div>
                     <div className="min-w-0">
                       <h3 className="text-sm font-semibold truncate">{agent.name}</h3>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground/70">
                         {agent.latestVersion?.version || "v0.1.0"}
                       </p>
                     </div>
@@ -234,7 +240,7 @@ export default function AgentsPage() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-all duration-200 rounded-lg"
                         >
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
@@ -260,10 +266,10 @@ export default function AgentsPage() {
                     </DropdownMenu>
                   </div>
                 </div>
-                <p className="mt-3 text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                <p className="mt-3 text-xs text-muted-foreground/80 line-clamp-2 leading-relaxed">
                   {agent.description || "No description"}
                 </p>
-                <div className="mt-3 flex items-center gap-1 text-xs text-muted-foreground">
+                <div className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground/60">
                   <Clock className="h-3 w-3" />
                   <span>
                     Updated{" "}
@@ -272,8 +278,8 @@ export default function AgentsPage() {
                     })}
                   </span>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           ))}
         </div>
       )}

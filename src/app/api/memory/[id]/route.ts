@@ -7,11 +7,12 @@ export const runtime = "nodejs";
 // GET /api/memory/[id] - Get a single memory collection
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const collection = await db.memoryCollection.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         documents: { orderBy: { createdAt: "desc" } },
         agents: {
@@ -40,11 +41,12 @@ export async function GET(
 // DELETE /api/memory/[id] - Delete a memory collection
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const collection = await db.memoryCollection.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!collection) {
@@ -62,7 +64,7 @@ export async function DELETE(
       // ChromaDB might not be running
     }
 
-    await db.memoryCollection.delete({ where: { id: params.id } });
+    await db.memoryCollection.delete({ where: { id } });
 
     return NextResponse.json({ success: true });
   } catch (err) {
@@ -77,9 +79,10 @@ export async function DELETE(
 // PUT /api/memory/[id] - Attach/detach collection to an agent
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const { agentId, action } = await request.json();
 
     if (!agentId || !action) {
@@ -93,14 +96,14 @@ export async function PUT(
       await db.agentMemory.create({
         data: {
           agentId,
-          collectionId: params.id,
+          collectionId: id,
         },
       });
     } else if (action === "detach") {
       await db.agentMemory.deleteMany({
         where: {
           agentId,
-          collectionId: params.id,
+          collectionId: id,
         },
       });
     }

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { Bot, Rocket, FlaskConical, Plus, ArrowRight, Inbox } from "lucide-react";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -35,11 +34,11 @@ const actionIcons = {
   updated: Bot,
 };
 
-const actionColors = {
-  tested: "text-purple-500",
-  deployed: "text-emerald-500",
-  created: "text-blue-500",
-  updated: "text-amber-500",
+const actionGradients = {
+  tested: "from-violet-500 to-purple-600",
+  deployed: "from-emerald-500 to-teal-600",
+  created: "from-blue-500 to-indigo-600",
+  updated: "from-amber-500 to-orange-600",
 };
 
 export function ActivityFeed() {
@@ -58,7 +57,6 @@ export function ActivityFeed() {
   useEffect(() => {
     async function fetchActivity() {
       try {
-        // Get agents to build name lookup
         const agentsRes = await fetch("/api/agents");
         const agents = agentsRes.ok ? await agentsRes.json() : [];
         const agentMap: AgentMap = {};
@@ -68,7 +66,6 @@ export function ActivityFeed() {
           }
         }
 
-        // Get recent logs across all agents
         const allLogs: LogItem[] = [];
         for (const a of Array.isArray(agents) ? agents : []) {
           try {
@@ -85,7 +82,6 @@ export function ActivityFeed() {
           }
         }
 
-        // Sort by timestamp desc and take top 10
         allLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
         const recent = allLogs.slice(0, 10);
 
@@ -110,49 +106,55 @@ export function ActivityFeed() {
   }, []);
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-base font-semibold">Recent Activity</CardTitle>
+    <div className="rounded-2xl border border-border/50 bg-card overflow-hidden animate-fade-in-up transition-all duration-300 hover:shadow-premium">
+      <div className="flex items-center justify-between p-6 pb-3">
+        <h3 className="text-base font-semibold">Recent Activity</h3>
         <Link
           href="/agents"
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="group flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors duration-200"
         >
           View all
-          <ArrowRight className="h-3.5 w-3.5" />
+          <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
         </Link>
-      </CardHeader>
-      <CardContent>
+      </div>
+      <div className="px-6 pb-6">
         {loading ? (
           <div className="space-y-3 animate-pulse">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-10 rounded bg-muted" />
+              <div key={i} className="h-12 rounded-xl bg-muted/50" />
             ))}
           </div>
         ) : activities.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <Inbox className="h-8 w-8 text-muted-foreground mb-2" />
-            <p className="text-sm text-muted-foreground">No recent activity</p>
-            <p className="text-xs text-muted-foreground mt-1">
+          <div className="flex flex-col items-center justify-center py-10 text-center">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted/50 mb-3">
+              <Inbox className="h-5 w-5 text-muted-foreground" />
+            </div>
+            <p className="text-sm font-medium text-muted-foreground">No recent activity</p>
+            <p className="text-xs text-muted-foreground/70 mt-1.5">
               Activity will appear here when you deploy or test agents.
             </p>
           </div>
         ) : (
-          <div className="space-y-1">
+          <div className="space-y-1 stagger-children">
             {activities.map((activity) => {
               const Icon = actionIcons[activity.action];
               return (
                 <div
                   key={activity.id}
-                  className="flex items-center gap-3 rounded-md px-2 py-2.5 transition-colors hover:bg-muted/50"
+                  className="group flex items-center gap-3 rounded-xl px-3 py-3 transition-all duration-200 ease-out-expo hover:bg-[hsl(var(--foreground)/0.03)] animate-fade-in cursor-default"
                 >
-                  <div className={cn("shrink-0", actionColors[activity.action])}>
-                    <Icon className="h-4 w-4" />
+                  <div className={cn(
+                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br text-white",
+                    "transition-transform duration-200 ease-out-expo group-hover:scale-110",
+                    actionGradients[activity.action]
+                  )}>
+                    <Icon className="h-3.5 w-3.5" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">
                       {activity.agentName}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-muted-foreground/70 truncate">
                       {activity.message.length > 50
                         ? activity.message.slice(0, 50) + "..."
                         : activity.message}{" "}
@@ -170,7 +172,7 @@ export function ActivityFeed() {
             })}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

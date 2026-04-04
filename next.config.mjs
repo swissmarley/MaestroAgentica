@@ -1,11 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: ["@anthropic-ai/sdk", "chromadb", "pdf-parse", "mammoth", "xlsx"],
-  },
+  serverExternalPackages: ["@anthropic-ai/sdk", "chromadb", "pdf-parse", "mammoth", "exceljs"],
   webpack: (config, { isServer }) => {
     if (isServer) {
-      config.externals.push("chromadb", "@chroma-core/default-embed", "pdf-parse", "mammoth", "xlsx");
+      config.externals.push("chromadb", "@chroma-core/default-embed", "pdf-parse", "mammoth", "exceljs");
     }
     return config;
   },
